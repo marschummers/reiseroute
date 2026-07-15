@@ -26,11 +26,19 @@ im Repo — die aktive App ist jetzt **`index.html`** (PWA-Umbau, siehe unten).
 ```
 Trip { id, name, dateFrom, dateTo, notes, countries[], places: [Place] }
 Place { id, name, arrival (Datum|null), departure (Datum|null), note, lat, lng, activities: [Activity] }
-Activity { id, title, note }
+Activity { id, name, date (Datum|null), time (Uhrzeit|null), note }
 ```
-Alte, bereits gespeicherte Reisen im Vorgänger-Format (`trip.days = {date: [Station]}`) werden
-beim Laden automatisch nach `trip.places` migriert (`migrateTripIfNeeded()` in `index.html`) —
-keine Daten gehen dabei verloren, jede Station wird zu einem Ort mit einer Aktivität.
+Gedachte Nutzung: Der Ort trägt das grobe Datum (z.B. für alte Reisen, wo man nur noch weiß
+"Anfang der Mexiko-Reise 2024 war ich in Tulum"). Die Aktivität kann zusätzlich ein präzises
+Datum/Uhrzeit bekommen (z.B. "Whale Watching Tour am 3.10. um 9 Uhr") — das Aktivitäts-Datum
+wird beim Speichern validiert und muss innerhalb der Ankunft/Abreise des zugehörigen Orts liegen
+(falls dieser welche hat). Orte werden nach Ankunftsdatum sortiert, Aktivitäten innerhalb eines
+Orts nach Datum/Uhrzeit (undatierte jeweils ans Ende).
+
+Alte, bereits gespeicherte Reisen (egal ob im ursprünglichen Tages-Format `trip.days` oder im
+zwischenzeitlichen Orte-Format mit `activity.title` statt `activity.name`) werden beim Laden
+automatisch verlustfrei auf die aktuelle Struktur migriert (`migrateTripIfNeeded()` in
+`index.html`).
 
 ## PWA-Umbau — Status: fertig, lokal getestet
 Ziel-Architektur (mit Nutzer abgestimmt): Alle Daten NUR lokal auf dem iPhone (kein Server,

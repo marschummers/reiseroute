@@ -188,6 +188,7 @@
   .activity-item .dot{width:8px;height:8px;border-radius:50%;background:var(--teal);margin-top:6px;flex-shrink:0;}
   .activity-item .content{flex:1;}
   .activity-item .title{font-weight:600;font-size:14px;}
+  .activity-item .meta{font-size:12px;color:var(--text-soft);margin-top:1px;}
   .activity-item .note{
     font-size:13px;color:var(--text);background:#F2EFE6;border-left:2.5px solid var(--brass);
     padding:6px 10px;margin-top:6px;border-radius:0 6px 6px 0;white-space:pre-wrap;line-height:1.45;
@@ -407,35 +408,49 @@ let state = {
 // ---------- storage ----------
 // Frühere Datenstruktur gliederte Reisen nach Kalendertagen (trip.days = { 'YYYY-MM-DD': [Station] }).
 // Jetzt gliedert sich eine Reise nach Orten mit optionaler Ankunft/Abreise (trip.places = [Ort]),
-// die wiederum mehrere Aktivitäten enthalten können. Alte, bereits gespeicherte Reisen werden beim
-// Laden automatisch in die neue Struktur überführt, damit keine Daten verloren gehen.
+// die wiederum mehrere Aktivitäten (Name, optionales Datum/Uhrzeit, Notiz) enthalten können.
+// Alte, bereits gespeicherte Reisen werden beim Laden automatisch in die neue Struktur überführt,
+// damit keine Daten verloren gehen. Gibt { trip, changed } zurück, damit loadTrips() weiß, ob
+// nach der Migration neu gespeichert werden muss.
 function migrateTripIfNeeded(trip){
-  if(!trip.days){
-    if(!trip.places) trip.places = [];
-    return trip;
-  }
-  const places = [];
-  Object.keys(trip.days).sort().forEach(dayKey=>{
-    (trip.days[dayKey]||[]).forEach(station=>{
-      const activities = [];
-      if(station.activity || station.note){
-        activities.push({ id: uid(), title: station.activity || '', note: station.note || '' });
-      }
-      places.push({
-        id: station.id || uid(),
-        name: station.name,
-        arrival: dayKey,
-        departure: null,
-        note: '',
-        lat: station.lat != null ? station.lat : null,
-        lng: station.lng != null ? station.lng : null,
-        activities
+  let changed = false;
+
+  if(trip.days){
+    changed = true;
+    const places = [];
+    Object.keys(trip.days).sort().forEach(dayKey=>{
+      (trip.days[dayKey]||[]).forEach(station=>{
+        const activities = [];
+        if(station.activity || station.note){
+          activities.push({ id: uid(), name: station.activity || '', date: null, time: null, note: station.note || '' });
+        }
+        places.push({
+          id: station.id || uid(),
+          name: station.name,
+          arrival: dayKey,
+          departure: null,
+          note: '',
+          lat: station.lat != null ? station.lat : null,
+          lng: station.lng != null ? station.lng : null,
+          activities
+        });
       });
     });
+    trip.places = places;
+    delete trip.days;
+  }
+
+  if(!trip.places) trip.places = [];
+  trip.places.forEach(p=>{
+    if(!p.activities) p.activities = [];
+    p.activities.forEach(a=>{
+      if(a.name === undefined && a.title !== undefined){ a.name = a.title; delete a.title; changed = true; }
+      if(a.date === undefined){ a.date = null; changed = true; }
+      if(a.time === undefined){ a.time = null; changed = true; }
+    });
   });
-  trip.places = places;
-  delete trip.days;
-  return trip;
+
+  return { trip, changed };
 }
 
 async function loadTrips(){
@@ -444,8 +459,9 @@ async function loadTrips(){
     const raw = res && res.value ? JSON.parse(res.value) : [];
     let migrated = false;
     state.trips = raw.map(t=>{
-      if(t.days) migrated = true;
-      return migrateTripIfNeeded(t);
+      const result = migrateTripIfNeeded(t);
+      if(result.changed) migrated = true;
+      return result.trip;
     });
     if(migrated) await saveTrips();
   }catch(e){
@@ -506,6 +522,32 @@ function placeDateLabel(place){
   if(place.arrival) return 'ab ' + fmtDateShort(place.arrival);
   if(place.departure) return 'bis ' + fmtDateShort(place.departure);
   return 'Kein Datum';
+}
+
+// Aktivitäten mit Datum zuerst (chronologisch, bei gleichem Datum nach Uhrzeit), Aktivitäten
+// ohne Datum danach in Erfassungsreihenfolge.
+function sortedActivities(place){
+  return (place.activities||[])
+    .map((a, i)=>({ a, i }))
+    .sort((x, y)=>{
+      if(x.a.date && y.a.date){
+        if(x.a.date !== y.a.date) return x.a.date < y.a.date ? -1 : 1;
+        const xt = x.a.time || '', yt = y.a.time || '';
+        if(xt !== yt) return xt < yt ? -1 : 1;
+        return x.i - y.i;
+      }
+      if(x.a.date && !y.a.date) return -1;
+      if(!x.a.date && y.a.date) return 1;
+      return x.i - y.i;
+    })
+    .map(z => z.a);
+}
+
+function activityDateTimeLabel(a){
+  if(a.date && a.time) return fmtDateShort(a.date) + ', ' + a.time + ' Uhr';
+  if(a.date) return fmtDateShort(a.date);
+  if(a.time) return a.time + ' Uhr';
+  return '';
 }
 
 // ---------- rendering ----------
@@ -707,11 +749,12 @@ function renderTrip(app, trip){
               <button class="remove" onclick="removePlace('${trip.id}','${place.id}')">Ort entfernen</button>
             </div>
             <div class="activities">
-              ${activities.map(a => `
+              ${sortedActivities(place).map(a => `
                 <div class="activity-item">
                   <div class="dot"></div>
                   <div class="content">
-                    <div class="title">${escapeHtml(a.title)}</div>
+                    <div class="title">${escapeHtml(a.name)}</div>
+                    ${(a.date || a.time) ? `<div class="meta">${activityDateTimeLabel(a)}</div>` : ''}
                     ${a.note ? `<div class="note">${escapeHtml(a.note)}</div>` : ''}
                   </div>
                   <div class="activity-actions">
@@ -1097,8 +1140,12 @@ function submitEditPlace(tripId, placeId){
 function openNewActivityForm(tripId, placeId){
   showSheet(`
     <h3>Aktivität hinzufügen</h3>
-    <div class="field"><label>Titel</label><input id="a_title" placeholder="z.B. Tafelberg Wanderung"></div>
-    <div class="field"><label>Notiz (optional)</label><textarea id="a_note" rows="4" placeholder="z.B. Seilbahn um 9 Uhr, Rückweg zu Fuß…"></textarea></div>
+    <div class="field"><label>Name</label><input id="a_name" placeholder="z.B. Whale Watching Tour"></div>
+    <div class="row2">
+      <div class="field"><label>Datum (optional)</label><input id="a_date" type="date"></div>
+      <div class="field"><label>Uhrzeit (optional)</label><input id="a_time" type="time"></div>
+    </div>
+    <div class="field"><label>Notizen</label><textarea id="a_note" rows="4" placeholder="z.B. Treffpunkt am Hafen, Tickets schon gebucht…"></textarea></div>
     <div class="sheet-actions">
       <button class="secondary" onclick="closeSheet()">Abbrechen</button>
       <button class="primary" onclick="submitNewActivity('${tripId}','${placeId}')">Hinzufügen</button>
@@ -1106,17 +1153,35 @@ function openNewActivityForm(tripId, placeId){
   `);
 }
 
+// Liest Name/Datum/Uhrzeit/Notiz eines Aktivitäts-Formulars und prüft, dass ein gesetztes
+// Datum innerhalb der Ankunft/Abreise des zugehörigen Orts liegt (falls der Ort welche hat).
+function readActivityFields(idPrefix, place){
+  const name = document.getElementById(idPrefix+'name').value.trim();
+  const date = document.getElementById(idPrefix+'date').value || null;
+  const time = document.getElementById(idPrefix+'time').value || null;
+  const note = document.getElementById(idPrefix+'note').value.trim();
+  if(!name){ alert('Bitte einen Namen angeben.'); return null; }
+  if(date && place.arrival && date < place.arrival){
+    alert('Das Datum der Aktivität darf nicht vor der Ankunft am Ort liegen (' + fmtDateShort(place.arrival) + ').');
+    return null;
+  }
+  if(date && place.departure && date > place.departure){
+    alert('Das Datum der Aktivität darf nicht nach der Abreise vom Ort liegen (' + fmtDateShort(place.departure) + ').');
+    return null;
+  }
+  return { name, date, time, note };
+}
+
 function submitNewActivity(tripId, placeId){
   try{
-    const title = document.getElementById('a_title').value.trim();
-    if(!title){ alert('Bitte einen Titel angeben.'); return; }
-    const note = document.getElementById('a_note').value.trim();
     const trip = getTrip(tripId);
     if(!trip) return;
     const p = (trip.places||[]).find(x=>x.id===placeId);
     if(!p) return;
+    const draft = readActivityFields('a_', p);
+    if(!draft) return;
     if(!p.activities) p.activities = [];
-    p.activities.push({ id: uid(), title, note });
+    p.activities.push({ id: uid(), ...draft });
     closeSheet();
     state.openPlace = placeId;
     saveTrips();
@@ -1136,8 +1201,12 @@ function openEditActivityForm(tripId, placeId, activityId){
   if(!a) return;
   showSheet(`
     <h3>Aktivität bearbeiten</h3>
-    <div class="field"><label>Titel</label><input id="ea_title" value="${escapeHtml(a.title)}"></div>
-    <div class="field"><label>Notiz (optional)</label><textarea id="ea_note" rows="4">${escapeHtml(a.note||'')}</textarea></div>
+    <div class="field"><label>Name</label><input id="ea_name" value="${escapeHtml(a.name)}"></div>
+    <div class="row2">
+      <div class="field"><label>Datum (optional)</label><input id="ea_date" type="date" value="${a.date||''}"></div>
+      <div class="field"><label>Uhrzeit (optional)</label><input id="ea_time" type="time" value="${a.time||''}"></div>
+    </div>
+    <div class="field"><label>Notizen</label><textarea id="ea_note" rows="4">${escapeHtml(a.note||'')}</textarea></div>
     <div class="sheet-actions">
       <button class="secondary" onclick="closeSheet()">Abbrechen</button>
       <button class="primary" onclick="submitEditActivity('${tripId}','${placeId}','${activityId}')">Speichern</button>
@@ -1153,10 +1222,12 @@ function submitEditActivity(tripId, placeId, activityId){
     if(!p) return;
     const a = (p.activities||[]).find(x=>x.id===activityId);
     if(!a) return;
-    const title = document.getElementById('ea_title').value.trim();
-    if(!title){ alert('Bitte einen Titel angeben.'); return; }
-    a.title = title;
-    a.note = document.getElementById('ea_note').value.trim();
+    const draft = readActivityFields('ea_', p);
+    if(!draft) return;
+    a.name = draft.name;
+    a.date = draft.date;
+    a.time = draft.time;
+    a.note = draft.note;
     closeSheet();
     saveTrips();
     render();
