@@ -1,6 +1,6 @@
 // Bei jeder inhaltlichen Änderung an der App die Versionsnummer erhöhen,
 // damit Nutzer:innen die neue Version bekommen (alte Caches werden dann verworfen).
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const APP_CACHE = `reiseroute-app-${CACHE_VERSION}`;
 const TILE_CACHE = 'reiseroute-tiles';
 
@@ -8,6 +8,7 @@ const APP_SHELL = [
   './',
   './index.html',
   './manifest.json',
+  './data/countries.js',
   './vendor/leaflet/leaflet.css',
   './vendor/leaflet/leaflet.js',
   './vendor/leaflet/images/marker-icon.png',

@@ -6,7 +6,8 @@ getestet. `app.html` ist dieser ursprüngliche, getestete Stand und bleibt als R
 im Repo — die aktive App ist jetzt **`index.html`** (PWA-Umbau, siehe unten).
 
 ## Was die App aktuell kann
-- Reisen anlegen: Land/Länder (kommagetrennt, ersetzt "Name der Reise"), Von/Bis-Datum, Notizen
+- Reisen anlegen: Land/Länder über Autocomplete-Suche mit Flaggen-Emoji (Freitext als Fallback
+  möglich, falls ein Land nicht in der Liste ist), Von/Bis-Datum, Notizen
 - Pro Reise: **Orte** anlegen (Name, optionale Ankunft/Abreise, optionale Notiz), jeder Ort kann
   mehrere **Aktivitäten** enthalten (Titel + optionale mehrzeilige Bemerkung). Orte werden als
   Liste angezeigt, sortiert nach Ankunftsdatum (Orte ohne Datum stehen am Ende). Frühere
@@ -39,6 +40,17 @@ Alte, bereits gespeicherte Reisen (egal ob im ursprünglichen Tages-Format `trip
 zwischenzeitlichen Orte-Format mit `activity.title` statt `activity.name`) werden beim Laden
 automatisch verlustfrei auf die aktuelle Struktur migriert (`migrateTripIfNeeded()` in
 `index.html`).
+
+### Länder-Autocomplete
+`data/countries.js` enthält eine lokal generierte Liste aller ~250 Länder (deutscher Name +
+ISO-3166-1-Alpha-2-Code, keine Laufzeit-Abhängigkeit von einer API). Flaggen-Emoji werden aus
+dem Code berechnet (`codeToFlag()` in `index.html`, Standard-Unicode-Regional-Indicator-Technik).
+Bei der Länder-Eingabe (neue/bearbeitete Reise) tippt man z.B. "Süd" und bekommt passende
+Vorschläge inkl. Flagge; ausgewählte Länder werden als Chips angezeigt. Freitext-Eingaben (Land
+nicht in der Liste) funktionieren weiterhin als Fallback, bekommen dann aber keine Flagge.
+Hinweis: Flaggen-Emoji werden auf iPhone/Safari korrekt als Bild dargestellt; auf Windows kann es
+je nach Schriftart/Browser sein, dass nur die zwei Buchstaben des Ländercodes angezeigt werden —
+das ist eine Windows-Einschränkung, kein Bug.
 
 ## PWA-Umbau — Status: fertig, lokal getestet
 Ziel-Architektur (mit Nutzer abgestimmt): Alle Daten NUR lokal auf dem iPhone (kein Server,
