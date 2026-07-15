@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<title>Reiseroute</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1F3049">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Reiseroute">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<script src="vendor/leaflet/leaflet.js"></script>
+<style>
+  :root{
+    --ink:#1F3049;
+    --ink-2:#2E4560;
+    --paper:#E8ECE9;
+    --card:#FBFAF7;
+    --brass:#B8863B;
+    --teal:#4A7C74;
+    --line:#D3D8D2;
+    --danger:#B24B4B;
+    --text:#1F3049;
+    --text-soft:#5B6B78;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--text);}
+  .display{font-family:Palatino,"Iowan Old Style",Georgia,serif;}
+  .mono{font-family:SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.02em;}
+
+  header.app{
+    background:var(--ink);
+    color:#F5F2EA;
+    padding:18px 20px 16px;
+    position:sticky;top:0;z-index:1000;
+    box-shadow:0 2px 10px rgba(0,0,0,.15);
+  }
+  header.app .title{font-size:22px;font-weight:600;display:flex;align-items:center;gap:10px;}
+  header.app .sub{font-size:12.5px;color:#B9C4CE;margin-top:2px;}
+  header.app button.back{
+    background:none;border:none;color:#F5F2EA;font-size:15px;cursor:pointer;
+    padding:0;margin-bottom:6px;display:flex;align-items:center;gap:4px;opacity:.85;
+  }
+  header.app button.back:hover{opacity:1;}
+
+  .tabbar{display:flex;gap:6px;margin-top:14px;}
+  .tabbar button{
+    flex:1;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.15);color:#D9E0E6;
+    padding:9px 10px;border-radius:8px;font-size:13.5px;font-weight:600;cursor:pointer;
+  }
+  .tabbar button.active{background:#F5F2EA;color:var(--ink);border-color:#F5F2EA;}
+
+  main{max-width:720px;margin:0 auto;padding:16px 16px 90px;}
+
+  /* ---- Trip list ---- */
+  .trip-card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px 18px;
+    margin-bottom:12px;
+    cursor:pointer;
+    transition:box-shadow .15s ease, transform .15s ease;
+  }
+  .trip-card:hover{box-shadow:0 4px 14px rgba(31,48,73,.10);transform:translateY(-1px);}
+  .trip-card .name{font-size:19px;font-weight:600;}
+  .trip-card .dates{font-size:13px;color:var(--text-soft);margin-top:3px;}
+  .trip-card .meta{font-size:12.5px;color:var(--brass);margin-top:8px;font-weight:600;}
+
+  .empty{
+    text-align:center;padding:60px 20px;color:var(--text-soft);
+  }
+  .empty .stamp{
+    width:64px;height:64px;border:2px solid var(--brass);border-radius:50%;
+    display:flex;align-items:center;justify-content:center;margin:0 auto 14px;
+    color:var(--brass);font-size:26px;transform:rotate(-8deg);opacity:.7;
+  }
+
+  #listMap{
+    width:100%;height:220px;border-radius:12px;margin:4px 0 10px;border:1px solid var(--line);
+    position:relative;z-index:1;
+  }
+  .overview-label{font-size:12px;font-weight:700;color:var(--brass);text-transform:uppercase;letter-spacing:.06em;margin:6px 0 8px;}
+
+  button.primary{
+    background:var(--ink);color:#F5F2EA;border:none;border-radius:8px;
+    padding:12px 18px;font-size:15px;font-weight:600;cursor:pointer;width:100%;
+  }
+  button.primary:hover{background:var(--ink-2);}
+  button.secondary{
+    background:transparent;color:var(--ink);border:1.5px solid var(--line);border-radius:8px;
+    padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  button.secondary:hover{border-color:var(--ink);}
+  button.ghost{
+    background:none;border:none;color:var(--text-soft);cursor:pointer;font-size:13px;
+  }
+  button.danger-ghost{background:none;border:none;color:var(--danger);cursor:pointer;font-size:13px;}
+
+  .fab-wrap{position:fixed;bottom:20px;left:0;right:0;display:flex;justify-content:center;z-index:15;}
+  .fab-wrap .inner{width:100%;max-width:720px;padding:0 16px;}
+
+  /* ---- Modal / form ---- */
+  .overlay{
+    position:fixed;inset:0;background:rgba(15,23,35,.45);
+    display:flex;align-items:flex-end;justify-content:center;z-index:2000;
+  }
+  .sheet{
+    background:var(--card);width:100%;max-width:720px;border-radius:16px 16px 0 0;
+    padding:22px 20px calc(20px + env(safe-area-inset-bottom));
+    max-height:88vh;overflow-y:auto;
+  }
+  .sheet h3{margin:0 0 16px;font-size:18px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12.5px;font-weight:600;color:var(--text-soft);margin-bottom:5px;}
+  .field input, .field textarea{
+    width:100%;border:1.5px solid var(--line);border-radius:8px;padding:10px 12px;
+    font-size:15px;font-family:inherit;background:#fff;color:var(--text);
+  }
+  .field input:focus, .field textarea:focus{outline:none;border-color:var(--teal);}
+  .row2{display:flex;gap:10px;}
+  .row2 .field{flex:1;}
+  .sheet-actions{display:flex;gap:10px;margin-top:6px;}
+  .sheet-actions button{flex:1;}
+
+  /* ---- Trip detail ---- */
+  .trip-header{margin-bottom:14px;}
+  .trip-header .name{font-size:24px;font-weight:600;}
+  .trip-header .dates{font-size:13.5px;color:var(--text-soft);margin-top:2px;}
+
+  .notes-box{
+    background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:14px 16px;margin:14px 0;
+  }
+  .notes-box .label{font-size:12px;font-weight:700;color:var(--brass);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+  .notes-box textarea{width:100%;border:none;background:transparent;resize:vertical;min-height:60px;font-size:14.5px;font-family:inherit;color:var(--text);}
+  .notes-box textarea:focus{outline:none;}
+
+  #map{
+    width:100%;height:280px;border-radius:12px;margin:14px 0;border:1px solid var(--line);
+    z-index:1;
+  }
+  .map-hint{font-size:12.5px;color:var(--text-soft);margin:-8px 0 14px;text-align:center;}
+
+  .day{
+    background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:10px;overflow:hidden;
+  }
+  .day-head{
+    display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;
+  }
+  .stamp-day{
+    width:38px;height:38px;border-radius:50%;border:2px solid var(--brass);color:var(--brass);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;
+    transform:rotate(-6deg);
+  }
+  .day-head .info{flex:1;}
+  .day-head .date{font-size:14.5px;font-weight:600;}
+  .day-head .count{font-size:12px;color:var(--text-soft);}
+  .day-head .chev{color:var(--text-soft);transition:transform .15s ease;}
+  .day.open .chev{transform:rotate(180deg);}
+  .day-body{display:none;padding:0 14px 14px;}
+  .day.open .day-body{display:block;}
+
+  .station{
+    display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-top:1px solid var(--line);
+  }
+  .station .dot{width:8px;height:8px;border-radius:50%;background:var(--teal);margin-top:6px;flex-shrink:0;}
+  .station .content{flex:1;}
+  .station .place{font-weight:600;font-size:14.5px;}
+  .station .activity{font-size:13.5px;color:var(--text-soft);margin-top:1px;}
+  .station .note{
+    font-size:13px;color:var(--text);background:#F2EFE6;border-left:2.5px solid var(--brass);
+    padding:6px 10px;margin-top:6px;border-radius:0 6px 6px 0;white-space:pre-wrap;line-height:1.45;
+  }
+  .station .geo{font-size:11px;color:#9AA6AF;margin-top:6px;}
+  .place-later-btn{
+    background:none;border:1px dashed var(--brass);color:var(--brass);border-radius:6px;
+    padding:4px 8px;font-size:11.5px;font-weight:600;cursor:pointer;margin-top:6px;
+  }
+  .station-actions{display:flex;flex-direction:column;gap:6px;align-items:flex-end;}
+  .station .edit{background:none;border:none;color:var(--teal);cursor:pointer;font-size:12px;padding:2px 4px;}
+  .station .remove{background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:2px 4px;}
+
+  .add-station-btn{
+    width:100%;margin-top:8px;background:none;border:1.5px dashed var(--line);border-radius:8px;
+    padding:10px;font-size:13.5px;color:var(--teal);font-weight:600;cursor:pointer;
+  }
+  .add-station-btn:hover{border-color:var(--teal);}
+
+  .place-picker-banner{
+    position:fixed;top:78px;left:0;right:0;z-index:30;display:flex;justify-content:center;
+  }
+  .place-picker-banner .inner{
+    max-width:690px;width:calc(100% - 32px);background:var(--brass);color:#fff;border-radius:10px;
+    padding:10px 14px;font-size:13.5px;font-weight:600;display:flex;align-items:center;justify-content:space-between;
+    box-shadow:0 4px 14px rgba(0,0,0,.2);
+  }
+  .place-picker-banner button{background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;}
+
+  .loading, .error-box{text-align:center;padding:40px;color:var(--text-soft);}
+  .pin-icon{background:none;border:none;}
+
+  .login-screen{
+    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background:var(--ink);padding:20px;
+  }
+  .login-box{
+    background:var(--card);border-radius:14px;padding:32px 26px;max-width:340px;width:100%;
+    text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.3);
+  }
+  .login-box .icon{font-size:34px;margin-bottom:10px;}
+  .login-box h2{margin:0 0 6px;font-size:19px;color:var(--ink);}
+  .login-box p{margin:0 0 18px;font-size:13px;color:var(--text-soft);}
+  .login-box input{
+    width:100%;border:1.5px solid var(--line);border-radius:8px;padding:12px 14px;
+    font-size:16px;text-align:center;margin-bottom:12px;font-family:inherit;
+  }
+  .login-box input:focus{outline:none;border-color:var(--teal);}
+  .login-box .err{color:var(--danger);font-size:13px;margin-bottom:10px;min-height:16px;}
+
+  .country-stat{
+    text-align:center;padding:22px 10px 26px;
+  }
+  .country-stat .num{font-size:44px;font-weight:700;color:var(--ink);line-height:1;}
+  .country-stat .label{font-size:13px;color:var(--text-soft);margin-top:4px;}
+  .country-row{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:13px 16px;margin-bottom:8px;
+  }
+  .country-row .name{font-weight:600;font-size:15px;}
+  .country-row .dates{font-size:12.5px;color:var(--text-soft);text-align:right;}
+</style>
+</head>
+<body>
+
+<header class="app">
+  <div id="headerContent">
+    <div class="title">🧭 Reiseroute</div>
+    <div class="sub">Deine Reisen, Tag für Tag</div>
+  </div>
+</header>
+
+<div id="pickerBanner"></div>
+
+<main id="app"></main>
+
+<script>
+const STORAGE_KEY = 'trips';
+const ACCESS_KEY = 'access_unlocked';
+const ACCESS_PASSWORD = 'Jackyy';
+
+// ---------- lokale Datenspeicherung (IndexedDB) ----------
+// Ersetzt die Claude.ai-spezifische window.storage-API, die außerhalb von
+// Claude-Artifacts nicht existiert. Gleiches get/set-Interface, damit der
+// Rest der App unverändert bleibt: storage.get(key) -> {value} | null,
+// storage.set(key, value) -> Promise.
+const DB_NAME = 'reiseroute-db';
+const DB_STORE = 'kv';
+let dbPromise = null;
+
+function openDb(){
+  if(dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject)=>{
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = ()=>{
+      req.result.createObjectStore(DB_STORE, { keyPath:'key' });
+    };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+  return dbPromise;
+}
+
+const storage = {
+  async get(key){
+    const db = await openDb();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(DB_STORE, 'readonly');
+      const req = tx.objectStore(DB_STORE).get(key);
+      req.onsuccess = ()=> resolve(req.result ? { value: req.result.value } : null);
+      req.onerror = ()=> reject(req.error);
+    });
+  },
+  async set(key, value){
+    const db = await openDb();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(DB_STORE, 'readwrite');
+      tx.objectStore(DB_STORE).put({ key, value });
+      tx.oncomplete = ()=> resolve();
+      tx.onerror = ()=> reject(tx.error);
+    });
+  }
+};
+
+let unlocked = false;
+
+async function checkAccess(){
+  try{
+    const res = await storage.get(ACCESS_KEY);
+    if(res && res.value === 'true'){
+      unlocked = true;
+    }
+  }catch(e){
+    // kein gespeicherter Zugang vorhanden -> Login zeigen
+  }
+  if(unlocked){
+    loadTrips();
+  }else{
+    renderLogin();
+  }
+}
+
+function renderLogin(errMsg){
+  document.getElementById('headerContent').innerHTML = '';
+  document.getElementById('pickerBanner').innerHTML = '';
+  document.getElementById('app').innerHTML = `
+    <div class="login-screen">
+      <div class="login-box">
+        <div class="icon">🔒</div>
+        <h2>Reiseroute</h2>
+        <p>Bitte Passwort eingeben</p>
+        <input type="password" id="pw" placeholder="Passwort" autofocus>
+        <div class="err">${errMsg || ''}</div>
+        <button class="primary" onclick="submitPassword()">Entsperren</button>
+      </div>
+    </div>
+  `;
+  const pwField = document.getElementById('pw');
+  pwField.focus();
+  pwField.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') submitPassword(); });
+}
+
+async function submitPassword(){
+  const val = document.getElementById('pw').value;
+  if(val === ACCESS_PASSWORD){
+    unlocked = true;
+    try{ await storage.set(ACCESS_KEY, 'true'); }catch(e){}
+    loadTrips();
+  }else{
+    renderLogin('Falsches Passwort. Nochmal versuchen.');
+  }
+}
+
+Object.assign(window, { submitPassword });
+
+// Eigene Pin-Nadel als Inline-SVG statt externer Icon-Bilder (die im Sandbox-Iframe
+// nicht zuverlässig laden) — funktioniert garantiert ohne Netzwerk-Abhängigkeit.
+function pinIcon(color){
+  const svg = `
+    <svg width="30" height="42" viewBox="0 0 30 42" xmlns="http://www.w3.org/2000/svg">
+      <path d="M15 0C6.7 0 0 6.7 0 15c0 11.2 15 27 15 27s15-15.8 15-27C30 6.7 23.3 0 15 0z" fill="${color}" stroke="#fff" stroke-width="1.5"/>
+      <circle cx="15" cy="15" r="5.5" fill="#fff"/>
+    </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: 'pin-icon',
+    iconSize: [30, 42],
+    iconAnchor: [15, 40],
+    popupAnchor: [0, -36]
+  });
+}
+
+function showToast(msg){
+  let t = document.getElementById('toast');
+  if(t) t.remove();
+  t = document.createElement('div');
+  t.id = 'toast';
+  t.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1F3049;color:#fff;padding:10px 16px;border-radius:8px;font-size:13.5px;z-index:100;max-width:85%;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.25);';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=> t.remove(), 4000);
+}
+
+window.addEventListener('error', (e)=>{
+  console.error('App-Fehler:', e.error || e.message);
+  showToast('Etwas ist schiefgelaufen: ' + (e.message || 'unbekannter Fehler') + '. Bitte nochmal versuchen.');
+});
+
+let state = {
+  view: 'loading', // loading | list | trip
+  trips: [],
+  currentTripId: null,
+  openDay: null,
+  placing: null, // {tripId, dayKey, stationDraft:{name, activity}} while waiting for map click
+  map: null,
+  markers: [],
+  polyline: null,
+  error: null
+};
+
+// ---------- storage ----------
+async function loadTrips(){
+  try{
+    const res = await storage.get(STORAGE_KEY);
+    state.trips = res && res.value ? JSON.parse(res.value) : [];
+  }catch(e){
+    state.trips = [];
+  }
+  state.view = 'list';
+  render();
+}
+
+async function saveTrips(){
+  try{
+    await storage.set(STORAGE_KEY, JSON.stringify(state.trips));
+  }catch(e){
+    state.error = 'Speichern fehlgeschlagen. Bitte erneut versuchen.';
+    render();
+  }
+}
+
+// ---------- helpers ----------
+function uid(){ return Math.random().toString(36).slice(2,10); }
+
+function dateRange(from, to){
+  const days = [];
+  const [fy,fm,fd] = from.split('-').map(Number);
+  const [ty,tm,td] = to.split('-').map(Number);
+  let cur = Date.UTC(fy, fm-1, fd);
+  const end = Date.UTC(ty, tm-1, td);
+  while(cur <= end){
+    days.push(new Date(cur).toISOString().slice(0,10));
+    cur += 86400000; // + 1 Tag in Millisekunden, zeitzonenunabhängig
+  }
+  return days;
+}
+
+function fmtDate(iso){
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit' });
+}
+function fmtDateShort(iso){
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
+
+function getTrip(id){ return state.trips.find(t => t.id === id); }
+
+function allStationsOfDay(trip, dayKey){
+  return (trip.days && trip.days[dayKey]) ? trip.days[dayKey] : [];
+}
+
+// ---------- rendering ----------
+function render(){
+  const app = document.getElementById('app');
+  const header = document.getElementById('headerContent');
+  const banner = document.getElementById('pickerBanner');
+
+  if(state.view === 'loading'){
+    app.innerHTML = '<div class="loading">Lade deine Reisen…</div>';
+    header.innerHTML = '<div class="title">🧭 Reiseroute</div><div class="sub">Deine Reisen, Tag für Tag</div>';
+    banner.innerHTML = '';
+    return;
+  }
+
+  if(state.view === 'list'){
+    header.innerHTML = `
+      <div class="title">🧭 Reiseroute</div>
+      <div class="sub">Deine Reisen, Tag für Tag</div>
+      <div class="tabbar">
+        <button class="active" onclick="switchTab('list')">Reisen</button>
+        <button onclick="switchTab('countries')">Besuchte Länder</button>
+      </div>
+    `;
+    banner.innerHTML = '';
+    renderList(app);
+    return;
+  }
+
+  if(state.view === 'countries'){
+    header.innerHTML = `
+      <div class="title">🧭 Reiseroute</div>
+      <div class="sub">Deine Reisen, Tag für Tag</div>
+      <div class="tabbar">
+        <button onclick="switchTab('list')">Reisen</button>
+        <button class="active" onclick="switchTab('countries')">Besuchte Länder</button>
+      </div>
+    `;
+    banner.innerHTML = '';
+    renderCountries(app);
+    return;
+  }
+
+  if(state.view === 'trip'){
+    const trip = getTrip(state.currentTripId);
+    if(!trip){ state.view='list'; render(); return; }
+    header.innerHTML = `
+      <button class="back" onclick="goList()">‹ Alle Reisen</button>
+      <div class="title">${escapeHtml(trip.name)}</div>
+      <div class="sub">${fmtDateShort(trip.dateFrom)} – ${fmtDateShort(trip.dateTo)}
+        <a href="javascript:void(0)" onclick="openEditTripForm('${trip.id}')" style="color:#D9C89A;margin-left:8px;text-decoration:underline;">Bearbeiten</a>
+      </div>
+    `;
+    renderPickerBanner(banner);
+    renderTrip(app, trip);
+    return;
+  }
+}
+
+function renderPickerBanner(banner){
+  if(!state.placing){ banner.innerHTML=''; return; }
+  const label = state.placing.mode === 'update' ? state.placing.stationName : state.placing.stationDraft.name;
+  banner.innerHTML = `
+    <div class="place-picker-banner">
+      <div class="inner">
+        <span>📍 Tippe auf die Karte, um „${escapeHtml(label)}" zu platzieren</span>
+        <button onclick="cancelPlacing()">Abbrechen</button>
+      </div>
+    </div>`;
+}
+
+function switchTab(tab){
+  state.view = tab;
+  render();
+}
+
+function computeCountryStats(){
+  const map = {}; // key: lowercase name -> {display, dateFrom, dateTo}
+  state.trips.forEach(t=>{
+    (t.countries||[]).forEach(c=>{
+      const key = c.trim().toLowerCase();
+      if(!key) return;
+      const existing = map[key];
+      if(!existing || t.dateFrom > existing.dateFrom){
+        map[key] = { display: c.trim(), dateFrom: t.dateFrom, dateTo: t.dateTo };
+      }
+    });
+  });
+  return Object.values(map).sort((a,b)=> a.display.localeCompare(b.display, 'de'));
+}
+
+function renderCountries(app){
+  const countries = computeCountryStats();
+  let html = `
+    <div class="country-stat">
+      <div class="num">${countries.length}</div>
+      <div class="label">${countries.length===1?'Land besucht':'Länder besucht'}</div>
+    </div>
+  `;
+  if(countries.length === 0){
+    html += `
+      <div class="empty">
+        <div class="stamp">🌍</div>
+        <div class="display" style="font-size:18px;margin-bottom:6px;">Noch keine Länder erfasst</div>
+        <div style="font-size:13.5px;">Trage bei einer Reise unter „Land/Länder" ein, wo du warst — hier siehst du dann die Übersicht.</div>
+      </div>`;
+  } else {
+    countries.forEach(c=>{
+      html += `
+        <div class="country-row">
+          <div class="name">${escapeHtml(c.display)}</div>
+          <div class="dates">${fmtDateShort(c.dateFrom)} –<br>${fmtDateShort(c.dateTo)}</div>
+        </div>`;
+    });
+  }
+  html += `<div style="height:30px"></div>`;
+  app.innerHTML = html;
+}
+
+function renderList(app){
+  let html = '';
+
+  const hasAnyStation = state.trips.some(t => Object.values(t.days||{}).some(day => day.some(s => s.lat != null)));
+  if(hasAnyStation){
+    html += `<div class="overview-label">Alle Reisen im Überblick</div>`;
+    html += `<div id="listMap"></div>`;
+  }
+
+  if(state.trips.length === 0){
+    html += `
+      <div class="empty">
+        <div class="stamp">✈</div>
+        <div class="display" style="font-size:18px;margin-bottom:6px;">Noch keine Reise angelegt</div>
+        <div style="font-size:13.5px;">Leg deine erste Reise an und trage Stationen, Aktivitäten und die Route ein.</div>
+      </div>`;
+  } else {
+    state.trips
+      .slice()
+      .sort((a,b)=> a.dateFrom < b.dateFrom ? 1 : -1)
+      .forEach(t=>{
+        const dayCount = dateRange(t.dateFrom, t.dateTo).length;
+        html += `
+        <div class="trip-card" onclick="openTrip('${t.id}')">
+          <div class="name display">${escapeHtml(t.name)}</div>
+          <div class="dates">${fmtDateShort(t.dateFrom)} – ${fmtDateShort(t.dateTo)}</div>
+          <div class="meta">${dayCount} ${dayCount===1?'Tag':'Tage'}</div>
+        </div>`;
+      });
+  }
+  html += `<div style="height:70px"></div>`;
+  app.innerHTML = html;
+
+  app.insertAdjacentHTML('beforeend', `
+    <div class="fab-wrap"><div class="inner">
+      <button class="primary" onclick="openNewTripForm()">+ Neue Reise anlegen</button>
+    </div></div>`);
+
+  if(hasAnyStation) initListMap();
+}
+
+function renderTrip(app, trip){
+  const days = dateRange(trip.dateFrom, trip.dateTo);
+  let html = `
+    <div class="notes-box">
+      <div class="label">Notizen zur Planung</div>
+      <textarea id="notesField" placeholder="z.B. Flugdaten, Packliste, Ideen…" oninput="onNotesInput(this.value)">${escapeHtml(trip.notes||'')}</textarea>
+    </div>
+    <div id="map"></div>
+    <div class="map-hint">Karte zeigt alle Stationen der Reise. Marker sind verschiebbar.</div>
+  `;
+
+  days.forEach((dayKey, idx) => {
+    const stations = allStationsOfDay(trip, dayKey);
+    const isOpen = state.openDay === dayKey;
+    html += `
+      <div class="day ${isOpen?'open':''}">
+        <div class="day-head" onclick="toggleDay('${dayKey}')">
+          <div class="stamp-day mono">${idx+1}</div>
+          <div class="info">
+            <div class="date">${fmtDate(dayKey)}</div>
+            <div class="count">${stations.length} ${stations.length===1?'Station':'Stationen'}</div>
+          </div>
+          <div class="chev">▾</div>
+        </div>
+        <div class="day-body">
+          ${stations.map(s => `
+            <div class="station">
+              <div class="dot"></div>
+              <div class="content">
+                <div class="place">${escapeHtml(s.name)}</div>
+                ${s.activity ? `<div class="activity">${escapeHtml(s.activity)}</div>` : ''}
+                ${s.note ? `<div class="note">${escapeHtml(s.note)}</div>` : ''}
+                <div class="geo mono">${s.lat!=null ? s.lat.toFixed(4)+', '+s.lng.toFixed(4) : 'kein Marker gesetzt'}</div>
+                ${s.lat==null ? `<button class="place-later-btn" onclick="startPlacingExisting('${trip.id}','${dayKey}','${s.id}','${escapeHtml(s.name)}')">📍 Jetzt auf Karte platzieren</button>` : ''}
+              </div>
+              <div class="station-actions">
+                <button class="edit" onclick="openEditStationForm('${trip.id}','${dayKey}','${s.id}')">Bearbeiten</button>
+                <button class="remove" onclick="removeStation('${trip.id}','${dayKey}','${s.id}')">Entfernen</button>
+              </div>
+            </div>
+          `).join('')}
+          <button class="add-station-btn" onclick="openNewStationForm('${dayKey}')">+ Station hinzufügen</button>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `<div style="height:30px"></div>`;
+  app.innerHTML = html;
+
+  initMap(trip);
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : str;
+  return div.innerHTML;
+}
+
+// ---------- map ----------
+function initMap(trip){
+  const el = document.getElementById('map');
+  if(!el) return;
+
+  if(typeof L === 'undefined'){
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:#5B6B78;">Karte konnte nicht geladen werden. Bitte Seite neu laden.</div>';
+    return;
+  }
+
+  if(state.map){ try{ state.map.remove(); }catch(e){} state.map=null; }
+
+  const map = L.map('map', { scrollWheelZoom:false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
+  }).addTo(map);
+  state.map = map;
+
+  const allStations = [];
+  Object.keys(trip.days || {}).sort().forEach(dayKey=>{
+    (trip.days[dayKey]||[]).forEach(s=>{
+      if(s.lat != null && s.lng != null){
+        allStations.push({...s, dayKey});
+      }
+    });
+  });
+
+  if(allStations.length === 0){
+    map.setView([20,10], 2);
+  } else {
+    const bounds = L.latLngBounds(allStations.map(s=>[s.lat,s.lng]));
+    map.fitBounds(bounds, { padding:[30,30] });
+  }
+
+  allStations.forEach(s=>{
+    const marker = L.marker([s.lat, s.lng], { draggable:true, icon: pinIcon('#B8863B') }).addTo(map);
+    marker.bindPopup(`<b>${escapeHtml(s.name)}</b>${s.activity?'<br>'+escapeHtml(s.activity):''}`);
+    marker.on('dragend', (e)=>{
+      const pos = e.target.getLatLng();
+      updateStationPosition(trip.id, s.dayKey, s.id, pos.lat, pos.lng);
+    });
+  });
+
+  if(allStations.length > 1){
+    L.polyline(allStations.map(s=>[s.lat,s.lng]), { color:'#B8863B', weight:3, opacity:.7, dashArray:'6,6' }).addTo(map);
+  }
+
+  map.on('click', (e)=>{
+    if(!state.placing) return;
+    if(state.placing.mode === 'update'){
+      const { tripId, dayKey, stationId } = state.placing;
+      updateStationPosition(tripId, dayKey, stationId, e.latlng.lat, e.latlng.lng);
+    } else {
+      const { tripId, dayKey, stationDraft } = state.placing;
+      addStationWithPosition(tripId, dayKey, stationDraft, e.latlng.lat, e.latlng.lng);
+    }
+    state.placing = null;
+    render();
+  });
+
+  setTimeout(()=> map.invalidateSize(), 150);
+}
+
+const TRIP_COLORS = ['#B8863B','#4A7C74','#5B6EAE','#A24B62','#3F8F5F','#8C6BB5','#C97B4A'];
+
+function initListMap(){
+  const el = document.getElementById('listMap');
+  if(!el) return;
+  if(typeof L === 'undefined'){
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:#5B6B78;">Karte konnte nicht geladen werden.</div>';
+    return;
+  }
+  if(state.listMap){ try{ state.listMap.remove(); }catch(e){} state.listMap=null; }
+
+  const map = L.map('listMap', {
+    scrollWheelZoom:false,
+    dragging:true,
+    zoomControl:true,
+    doubleClickZoom:false
+  });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
+  }).addTo(map);
+  state.listMap = map;
+
+  const allPoints = [];
+  state.trips.forEach((trip, i) => {
+    const color = TRIP_COLORS[i % TRIP_COLORS.length];
+    const tripPoints = [];
+    Object.keys(trip.days || {}).sort().forEach(dayKey=>{
+      (trip.days[dayKey]||[]).forEach(s=>{
+        if(s.lat != null && s.lng != null){
+          tripPoints.push([s.lat, s.lng]);
+          allPoints.push([s.lat, s.lng]);
+          const marker = L.marker([s.lat, s.lng], { draggable:false, icon: pinIcon(color) }).addTo(map);
+          marker.bindPopup(`<b>${escapeHtml(trip.name)}</b><br>${escapeHtml(s.name)}${s.activity?' — '+escapeHtml(s.activity):''}`);
+        }
+      });
+    });
+    if(tripPoints.length > 1){
+      L.polyline(tripPoints, { color, weight:2.5, opacity:.6, dashArray:'5,7' }).addTo(map);
+    }
+  });
+
+  if(allPoints.length){
+    map.fitBounds(L.latLngBounds(allPoints), { padding:[24,24] });
+  } else {
+    map.setView([20,10], 2);
+  }
+
+  // Nur zum Ansehen: kein Klick-Handler zum Platzieren, Marker nicht verschiebbar.
+  setTimeout(()=> map.invalidateSize(), 150);
+}
+
+// ---------- actions: trips ----------
+function goList(){
+  state.view = 'list';
+  state.currentTripId = null;
+  state.placing = null;
+  render();
+}
+
+function openTrip(id){
+  state.view = 'trip';
+  state.currentTripId = id;
+  state.openDay = null;
+  render();
+}
+
+function openNewTripForm(){
+  showSheet(`
+    <h3>Neue Reise</h3>
+    <div class="field"><label>Land / Länder (durch Komma getrennt)</label><input id="f_countries" placeholder="z.B. Südafrika, Namibia"></div>
+    <div class="row2">
+      <div class="field"><label>Von</label><input id="f_from" type="date"></div>
+      <div class="field"><label>Bis</label><input id="f_to" type="date"></div>
+    </div>
+    <div class="field"><label>Notizen (optional)</label><textarea id="f_notes" rows="2" placeholder="Planungsnotizen…"></textarea></div>
+    <div class="sheet-actions">
+      <button class="secondary" onclick="closeSheet()">Abbrechen</button>
+      <button class="primary" onclick="submitNewTrip()">Reise anlegen</button>
+    </div>
+  `);
+}
+
+function parseCountries(str){
+  return str.split(',').map(s=>s.trim()).filter(Boolean);
+}
+
+function submitNewTrip(){
+  try{
+    const from = document.getElementById('f_from').value;
+    const to = document.getElementById('f_to').value;
+    const notes = document.getElementById('f_notes').value.trim();
+    const countries = parseCountries(document.getElementById('f_countries').value);
+    if(!countries.length || !from || !to){ alert('Bitte mindestens ein Land sowie Von- und Bis-Datum angeben.'); return; }
+    if(from > to){ alert('Das „Bis"-Datum muss nach dem „Von"-Datum liegen.'); return; }
+
+    const name = countries.join(', ');
+    const trip = { id: uid(), name, dateFrom: from, dateTo: to, notes, countries, days:{} };
+    state.trips.push(trip);
+    closeSheet();
+    saveTrips();
+    openTrip(trip.id);
+  }catch(e){
+    console.error(e);
+    showToast('Reise konnte nicht angelegt werden: ' + e.message);
+  }
+}
+
+function openEditTripForm(tripId){
+  const trip = getTrip(tripId);
+  if(!trip) return;
+  showSheet(`
+    <h3>Reise bearbeiten</h3>
+    <div class="field"><label>Land / Länder (durch Komma getrennt)</label><input id="t_countries" value="${escapeHtml((trip.countries||[]).join(', '))}" placeholder="z.B. Südafrika, Namibia"></div>
+    <div class="row2">
+      <div class="field"><label>Von</label><input id="t_from" type="date" value="${trip.dateFrom}"></div>
+      <div class="field"><label>Bis</label><input id="t_to" type="date" value="${trip.dateTo}"></div>
+    </div>
+    <div class="field"><label>Notizen (optional)</label><textarea id="t_notes" rows="2">${escapeHtml(trip.notes||'')}</textarea></div>
+    <div class="sheet-actions">
+      <button class="secondary" onclick="closeSheet()">Abbrechen</button>
+      <button class="primary" onclick="submitEditTrip('${tripId}')">Speichern</button>
+    </div>
+  `);
+}
+
+function submitEditTrip(tripId){
+  try{
+    const trip = getTrip(tripId);
+    if(!trip) return;
+    const from = document.getElementById('t_from').value;
+    const to = document.getElementById('t_to').value;
+    const countries = parseCountries(document.getElementById('t_countries').value);
+    if(!countries.length || !from || !to){ alert('Bitte mindestens ein Land sowie Von- und Bis-Datum angeben.'); return; }
+    if(from > to){ alert('Das „Bis"-Datum muss nach dem „Von"-Datum liegen.'); return; }
+    trip.name = countries.join(', ');
+    trip.dateFrom = from;
+    trip.dateTo = to;
+    trip.countries = countries;
+    trip.notes = document.getElementById('t_notes').value.trim();
+    closeSheet();
+    saveTrips();
+    render();
+  }catch(e){
+    console.error(e);
+    showToast('Änderung konnte nicht gespeichert werden: ' + e.message);
+  }
+}
+
+function onNotesInput(val){
+  const trip = getTrip(state.currentTripId);
+  if(!trip) return;
+  trip.notes = val;
+  clearTimeout(window._notesTimer);
+  window._notesTimer = setTimeout(saveTrips, 500);
+}
+
+// ---------- actions: days / stations ----------
+function toggleDay(dayKey){
+  state.openDay = state.openDay === dayKey ? null : dayKey;
+  render();
+}
+
+function openNewStationForm(dayKey){
+  showSheet(`
+    <h3>Station hinzufügen — ${fmtDate(dayKey)}</h3>
+    <div class="field"><label>Ort</label><input id="s_name" placeholder="z.B. Kapstadt"></div>
+    <div class="field"><label>Tätigkeit (Titel)</label><input id="s_activity" placeholder="z.B. Kap der guten Hoffnung"></div>
+    <div class="field"><label>Bemerkung</label><textarea id="s_note" rows="4" placeholder="z.B. über Ostseite hinfahren, um 9 Uhr los, Rückweg bis 17 Uhr an der XY-Straße…"></textarea></div>
+    <div class="sheet-actions">
+      <button class="secondary" onclick="submitNewStationNoPosition('${dayKey}')">Ohne Position speichern</button>
+      <button class="primary" onclick="submitNewStation('${dayKey}')">Auf Karte platzieren</button>
+    </div>
+  `);
+}
+
+function readStationFields(){
+  const name = document.getElementById('s_name').value.trim();
+  const activity = document.getElementById('s_activity').value.trim();
+  const note = document.getElementById('s_note').value.trim();
+  if(!name){ alert('Bitte einen Ort angeben.'); return null; }
+  return { name, activity, note };
+}
+
+function submitNewStationNoPosition(dayKey){
+  const draft = readStationFields();
+  if(!draft) return;
+  closeSheet();
+  addStationWithPosition(state.currentTripId, dayKey, draft, null, null);
+  render();
+}
+
+function submitNewStation(dayKey){
+  const draft = readStationFields();
+  if(!draft) return;
+  closeSheet();
+  state.placing = { tripId: state.currentTripId, dayKey, mode:'create', stationDraft: draft };
+  render();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function cancelPlacing(){
+  state.placing = null;
+  render();
+}
+
+function startPlacingExisting(tripId, dayKey, stationId, stationName){
+  state.placing = { tripId, dayKey, mode:'update', stationId, stationName };
+  render();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function addStationWithPosition(tripId, dayKey, draft, lat, lng){
+  try{
+    const trip = getTrip(tripId);
+    if(!trip) return;
+    if(!trip.days[dayKey]) trip.days[dayKey] = [];
+    trip.days[dayKey].push({ id: uid(), name: draft.name, activity: draft.activity, note: draft.note || '', lat, lng });
+    state.openDay = dayKey;
+    saveTrips();
+    showToast('„' + draft.name + '" wurde platziert.');
+  }catch(e){
+    console.error(e);
+    showToast('Station konnte nicht gespeichert werden: ' + e.message);
+  }
+}
+
+function updateStationPosition(tripId, dayKey, stationId, lat, lng){
+  try{
+    const trip = getTrip(tripId);
+    if(!trip) return;
+    const s = (trip.days[dayKey]||[]).find(x=>x.id===stationId);
+    if(s){ s.lat = lat; s.lng = lng; saveTrips(); }
+  }catch(e){
+    console.error(e);
+    showToast('Position konnte nicht aktualisiert werden: ' + e.message);
+  }
+}
+
+function removeStation(tripId, dayKey, stationId){
+  const trip = getTrip(tripId);
+  if(!trip) return;
+  trip.days[dayKey] = (trip.days[dayKey]||[]).filter(s=>s.id!==stationId);
+  saveTrips();
+  render();
+}
+
+function openEditStationForm(tripId, dayKey, stationId){
+  const trip = getTrip(tripId);
+  if(!trip) return;
+  const s = (trip.days[dayKey]||[]).find(x=>x.id===stationId);
+  if(!s) return;
+  showSheet(`
+    <h3>Station bearbeiten — ${fmtDate(dayKey)}</h3>
+    <div class="field"><label>Ort</label><input id="e_name" value="${escapeHtml(s.name)}"></div>
+    <div class="field"><label>Tätigkeit (Titel)</label><input id="e_activity" value="${escapeHtml(s.activity||'')}"></div>
+    <div class="field"><label>Bemerkung</label><textarea id="e_note" rows="4">${escapeHtml(s.note||'')}</textarea></div>
+    <div class="sheet-actions">
+      <button class="secondary" onclick="closeSheet()">Abbrechen</button>
+      <button class="primary" onclick="submitEditStation('${tripId}','${dayKey}','${stationId}')">Speichern</button>
+    </div>
+  `);
+}
+
+function submitEditStation(tripId, dayKey, stationId){
+  try{
+    const trip = getTrip(tripId);
+    if(!trip) return;
+    const s = (trip.days[dayKey]||[]).find(x=>x.id===stationId);
+    if(!s) return;
+    const name = document.getElementById('e_name').value.trim();
+    if(!name){ alert('Bitte einen Ort angeben.'); return; }
+    s.name = name;
+    s.activity = document.getElementById('e_activity').value.trim();
+    s.note = document.getElementById('e_note').value.trim();
+    closeSheet();
+    saveTrips();
+    render();
+  }catch(e){
+    console.error(e);
+    showToast('Änderung konnte nicht gespeichert werden: ' + e.message);
+  }
+}
+
+// ---------- sheet (modal) ----------
+function showSheet(innerHtml){
+  let overlay = document.getElementById('overlay');
+  if(overlay) overlay.remove();
+  overlay = document.createElement('div');
+  overlay.id = 'overlay';
+  overlay.className = 'overlay';
+  overlay.innerHTML = `<div class="sheet">${innerHtml}</div>`;
+  overlay.addEventListener('click', (e)=>{ if(e.target === overlay) closeSheet(); });
+  document.body.appendChild(overlay);
+}
+function closeSheet(){
+  const overlay = document.getElementById('overlay');
+  if(overlay) overlay.remove();
+}
+
+// expose functions used inline
+Object.assign(window, {
+  goList, openTrip, openNewTripForm, submitNewTrip, onNotesInput,
+  toggleDay, openNewStationForm, submitNewStation, submitNewStationNoPosition, cancelPlacing,
+  removeStation, closeSheet, openEditStationForm, submitEditStation,
+  switchTab, openEditTripForm, submitEditTrip, startPlacingExisting
+});
+
+checkAccess();
+
+// ---------- PWA: Service Worker registrieren ----------
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('service-worker.js').catch(err=>{
+      console.error('Service Worker Registrierung fehlgeschlagen:', err);
+    });
+  });
+}
+</script>
+</body>
+</html>
