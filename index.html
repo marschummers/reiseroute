@@ -149,50 +149,58 @@
   }
   .map-hint{font-size:12.5px;color:var(--text-soft);margin:-8px 0 14px;text-align:center;}
 
-  .day{
+  .place-card{
     background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:10px;overflow:hidden;
   }
-  .day-head{
+  .place-card-head{
     display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;
   }
-  .stamp-day{
+  .place-pin{
     width:38px;height:38px;border-radius:50%;border:2px solid var(--brass);color:var(--brass);
-    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;
-    transform:rotate(-6deg);
+    display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;
   }
-  .day-head .info{flex:1;}
-  .day-head .date{font-size:14.5px;font-weight:600;}
-  .day-head .count{font-size:12px;color:var(--text-soft);}
-  .day-head .chev{color:var(--text-soft);transition:transform .15s ease;}
-  .day.open .chev{transform:rotate(180deg);}
-  .day-body{display:none;padding:0 14px 14px;}
-  .day.open .day-body{display:block;}
+  .place-card-head .info{flex:1;}
+  .place-card-head .name{font-size:15px;font-weight:600;}
+  .place-card-head .dates{font-size:12px;color:var(--text-soft);margin-top:1px;}
+  .place-card-head .chev{color:var(--text-soft);transition:transform .15s ease;}
+  .place-card.open .chev{transform:rotate(180deg);}
+  .place-card-body{display:none;padding:0 14px 14px;}
+  .place-card.open .place-card-body{display:block;}
 
-  .station{
-    display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-top:1px solid var(--line);
-  }
-  .station .dot{width:8px;height:8px;border-radius:50%;background:var(--teal);margin-top:6px;flex-shrink:0;}
-  .station .content{flex:1;}
-  .station .place{font-weight:600;font-size:14.5px;}
-  .station .activity{font-size:13.5px;color:var(--text-soft);margin-top:1px;}
-  .station .note{
-    font-size:13px;color:var(--text);background:#F2EFE6;border-left:2.5px solid var(--brass);
-    padding:6px 10px;margin-top:6px;border-radius:0 6px 6px 0;white-space:pre-wrap;line-height:1.45;
-  }
-  .station .geo{font-size:11px;color:#9AA6AF;margin-top:6px;}
+  .geo{font-size:11px;color:#9AA6AF;margin-top:10px;}
   .place-later-btn{
     background:none;border:1px dashed var(--brass);color:var(--brass);border-radius:6px;
     padding:4px 8px;font-size:11.5px;font-weight:600;cursor:pointer;margin-top:6px;
   }
-  .station-actions{display:flex;flex-direction:column;gap:6px;align-items:flex-end;}
-  .station .edit{background:none;border:none;color:var(--teal);cursor:pointer;font-size:12px;padding:2px 4px;}
-  .station .remove{background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:2px 4px;}
+  .place-note{
+    font-size:13px;color:var(--text);background:#F2EFE6;border-left:2.5px solid var(--brass);
+    padding:6px 10px;margin-top:10px;border-radius:0 6px 6px 0;white-space:pre-wrap;line-height:1.45;
+  }
+  .place-actions{display:flex;gap:16px;margin-top:12px;}
+  .place-actions .edit{background:none;border:none;color:var(--teal);cursor:pointer;font-size:12.5px;padding:2px 0;}
+  .place-actions .remove{background:none;border:none;color:var(--danger);cursor:pointer;font-size:12.5px;padding:2px 0;}
 
-  .add-station-btn{
+  .activities{margin-top:14px;border-top:1px solid var(--line);padding-top:8px;}
+  .activity-item{
+    display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid var(--line);
+  }
+  .activity-item:first-child{border-top:none;}
+  .activity-item .dot{width:8px;height:8px;border-radius:50%;background:var(--teal);margin-top:6px;flex-shrink:0;}
+  .activity-item .content{flex:1;}
+  .activity-item .title{font-weight:600;font-size:14px;}
+  .activity-item .note{
+    font-size:13px;color:var(--text);background:#F2EFE6;border-left:2.5px solid var(--brass);
+    padding:6px 10px;margin-top:6px;border-radius:0 6px 6px 0;white-space:pre-wrap;line-height:1.45;
+  }
+  .activity-actions{display:flex;flex-direction:column;gap:6px;align-items:flex-end;}
+  .activity-actions .edit{background:none;border:none;color:var(--teal);cursor:pointer;font-size:12px;padding:2px 4px;}
+  .activity-actions .remove{background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:2px 4px;}
+
+  .add-btn{
     width:100%;margin-top:8px;background:none;border:1.5px dashed var(--line);border-radius:8px;
     padding:10px;font-size:13.5px;color:var(--teal);font-weight:600;cursor:pointer;
   }
-  .add-station-btn:hover{border-color:var(--teal);}
+  .add-btn:hover{border-color:var(--teal);}
 
   .place-picker-banner{
     position:fixed;top:78px;left:0;right:0;z-index:30;display:flex;justify-content:center;
@@ -388,8 +396,8 @@ let state = {
   view: 'loading', // loading | list | trip
   trips: [],
   currentTripId: null,
-  openDay: null,
-  placing: null, // {tripId, dayKey, stationDraft:{name, activity}} while waiting for map click
+  openPlace: null,
+  placing: null, // {tripId, mode:'create', placeDraft} | {tripId, mode:'update', placeId, placeName} while waiting for map click
   map: null,
   markers: [],
   polyline: null,
@@ -397,10 +405,49 @@ let state = {
 };
 
 // ---------- storage ----------
+// Frühere Datenstruktur gliederte Reisen nach Kalendertagen (trip.days = { 'YYYY-MM-DD': [Station] }).
+// Jetzt gliedert sich eine Reise nach Orten mit optionaler Ankunft/Abreise (trip.places = [Ort]),
+// die wiederum mehrere Aktivitäten enthalten können. Alte, bereits gespeicherte Reisen werden beim
+// Laden automatisch in die neue Struktur überführt, damit keine Daten verloren gehen.
+function migrateTripIfNeeded(trip){
+  if(!trip.days){
+    if(!trip.places) trip.places = [];
+    return trip;
+  }
+  const places = [];
+  Object.keys(trip.days).sort().forEach(dayKey=>{
+    (trip.days[dayKey]||[]).forEach(station=>{
+      const activities = [];
+      if(station.activity || station.note){
+        activities.push({ id: uid(), title: station.activity || '', note: station.note || '' });
+      }
+      places.push({
+        id: station.id || uid(),
+        name: station.name,
+        arrival: dayKey,
+        departure: null,
+        note: '',
+        lat: station.lat != null ? station.lat : null,
+        lng: station.lng != null ? station.lng : null,
+        activities
+      });
+    });
+  });
+  trip.places = places;
+  delete trip.days;
+  return trip;
+}
+
 async function loadTrips(){
   try{
     const res = await storage.get(STORAGE_KEY);
-    state.trips = res && res.value ? JSON.parse(res.value) : [];
+    const raw = res && res.value ? JSON.parse(res.value) : [];
+    let migrated = false;
+    state.trips = raw.map(t=>{
+      if(t.days) migrated = true;
+      return migrateTripIfNeeded(t);
+    });
+    if(migrated) await saveTrips();
   }catch(e){
     state.trips = [];
   }
@@ -433,10 +480,6 @@ function dateRange(from, to){
   return days;
 }
 
-function fmtDate(iso){
-  const d = new Date(iso + 'T00:00:00');
-  return d.toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit' });
-}
 function fmtDateShort(iso){
   const d = new Date(iso + 'T00:00:00');
   return d.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
@@ -444,8 +487,25 @@ function fmtDateShort(iso){
 
 function getTrip(id){ return state.trips.find(t => t.id === id); }
 
-function allStationsOfDay(trip, dayKey){
-  return (trip.days && trip.days[dayKey]) ? trip.days[dayKey] : [];
+// Orte mit Ankunftsdatum zuerst (chronologisch), Orte ohne Datum danach in Erfassungsreihenfolge.
+function sortedPlaces(trip){
+  return (trip.places||[])
+    .map((p, i)=>({ p, i }))
+    .sort((a, b)=>{
+      const ad = a.p.arrival, bd = b.p.arrival;
+      if(ad && bd) return ad < bd ? -1 : ad > bd ? 1 : a.i - b.i;
+      if(ad && !bd) return -1;
+      if(!ad && bd) return 1;
+      return a.i - b.i;
+    })
+    .map(x => x.p);
+}
+
+function placeDateLabel(place){
+  if(place.arrival && place.departure) return fmtDateShort(place.arrival) + ' – ' + fmtDateShort(place.departure);
+  if(place.arrival) return 'ab ' + fmtDateShort(place.arrival);
+  if(place.departure) return 'bis ' + fmtDateShort(place.departure);
+  return 'Kein Datum';
 }
 
 // ---------- rendering ----------
@@ -507,7 +567,7 @@ function render(){
 
 function renderPickerBanner(banner){
   if(!state.placing){ banner.innerHTML=''; return; }
-  const label = state.placing.mode === 'update' ? state.placing.stationName : state.placing.stationDraft.name;
+  const label = state.placing.mode === 'update' ? state.placing.placeName : state.placing.placeDraft.name;
   banner.innerHTML = `
     <div class="place-picker-banner">
       <div class="inner">
@@ -568,8 +628,8 @@ function renderCountries(app){
 function renderList(app){
   let html = '';
 
-  const hasAnyStation = state.trips.some(t => Object.values(t.days||{}).some(day => day.some(s => s.lat != null)));
-  if(hasAnyStation){
+  const hasAnyPlace = state.trips.some(t => (t.places||[]).some(p => p.lat != null));
+  if(hasAnyPlace){
     html += `<div class="overview-label">Alle Reisen im Überblick</div>`;
     html += `<div id="listMap"></div>`;
   }
@@ -579,7 +639,7 @@ function renderList(app){
       <div class="empty">
         <div class="stamp">✈</div>
         <div class="display" style="font-size:18px;margin-bottom:6px;">Noch keine Reise angelegt</div>
-        <div style="font-size:13.5px;">Leg deine erste Reise an und trage Stationen, Aktivitäten und die Route ein.</div>
+        <div style="font-size:13.5px;">Leg deine erste Reise an und trage Orte, Aktivitäten und die Route ein.</div>
       </div>`;
   } else {
     state.trips
@@ -603,56 +663,72 @@ function renderList(app){
       <button class="primary" onclick="openNewTripForm()">+ Neue Reise anlegen</button>
     </div></div>`);
 
-  if(hasAnyStation) initListMap();
+  if(hasAnyPlace) initListMap();
 }
 
 function renderTrip(app, trip){
-  const days = dateRange(trip.dateFrom, trip.dateTo);
+  const places = sortedPlaces(trip);
   let html = `
     <div class="notes-box">
       <div class="label">Notizen zur Planung</div>
       <textarea id="notesField" placeholder="z.B. Flugdaten, Packliste, Ideen…" oninput="onNotesInput(this.value)">${escapeHtml(trip.notes||'')}</textarea>
     </div>
     <div id="map"></div>
-    <div class="map-hint">Karte zeigt alle Stationen der Reise. Marker sind verschiebbar.</div>
+    <div class="map-hint">Karte zeigt alle Orte der Reise. Marker sind verschiebbar.</div>
   `;
 
-  days.forEach((dayKey, idx) => {
-    const stations = allStationsOfDay(trip, dayKey);
-    const isOpen = state.openDay === dayKey;
+  if(places.length === 0){
     html += `
-      <div class="day ${isOpen?'open':''}">
-        <div class="day-head" onclick="toggleDay('${dayKey}')">
-          <div class="stamp-day mono">${idx+1}</div>
-          <div class="info">
-            <div class="date">${fmtDate(dayKey)}</div>
-            <div class="count">${stations.length} ${stations.length===1?'Station':'Stationen'}</div>
-          </div>
-          <div class="chev">▾</div>
-        </div>
-        <div class="day-body">
-          ${stations.map(s => `
-            <div class="station">
-              <div class="dot"></div>
-              <div class="content">
-                <div class="place">${escapeHtml(s.name)}</div>
-                ${s.activity ? `<div class="activity">${escapeHtml(s.activity)}</div>` : ''}
-                ${s.note ? `<div class="note">${escapeHtml(s.note)}</div>` : ''}
-                <div class="geo mono">${s.lat!=null ? s.lat.toFixed(4)+', '+s.lng.toFixed(4) : 'kein Marker gesetzt'}</div>
-                ${s.lat==null ? `<button class="place-later-btn" onclick="startPlacingExisting('${trip.id}','${dayKey}','${s.id}','${escapeHtml(s.name)}')">📍 Jetzt auf Karte platzieren</button>` : ''}
-              </div>
-              <div class="station-actions">
-                <button class="edit" onclick="openEditStationForm('${trip.id}','${dayKey}','${s.id}')">Bearbeiten</button>
-                <button class="remove" onclick="removeStation('${trip.id}','${dayKey}','${s.id}')">Entfernen</button>
-              </div>
+      <div class="empty" style="padding:36px 20px;">
+        <div class="stamp">📍</div>
+        <div class="display" style="font-size:16px;margin-bottom:6px;">Noch keine Orte erfasst</div>
+        <div style="font-size:13.5px;">Füge deinen ersten Ort hinzu, um Aktivitäten und die Route einzutragen.</div>
+      </div>`;
+  } else {
+    places.forEach(place => {
+      const isOpen = state.openPlace === place.id;
+      const activities = place.activities || [];
+      html += `
+        <div class="place-card ${isOpen?'open':''}">
+          <div class="place-card-head" onclick="togglePlace('${place.id}')">
+            <div class="place-pin">📍</div>
+            <div class="info">
+              <div class="name">${escapeHtml(place.name)}</div>
+              <div class="dates">${placeDateLabel(place)} · ${activities.length} ${activities.length===1?'Aktivität':'Aktivitäten'}</div>
             </div>
-          `).join('')}
-          <button class="add-station-btn" onclick="openNewStationForm('${dayKey}')">+ Station hinzufügen</button>
+            <div class="chev">▾</div>
+          </div>
+          <div class="place-card-body">
+            <div class="geo mono">${place.lat!=null ? place.lat.toFixed(4)+', '+place.lng.toFixed(4) : 'kein Marker gesetzt'}</div>
+            ${place.lat==null ? `<button class="place-later-btn" onclick="startPlacingExistingPlace('${trip.id}','${place.id}','${escapeHtml(place.name)}')">📍 Jetzt auf Karte platzieren</button>` : ''}
+            ${place.note ? `<div class="place-note">${escapeHtml(place.note)}</div>` : ''}
+            <div class="place-actions">
+              <button class="edit" onclick="openEditPlaceForm('${trip.id}','${place.id}')">Ort bearbeiten</button>
+              <button class="remove" onclick="removePlace('${trip.id}','${place.id}')">Ort entfernen</button>
+            </div>
+            <div class="activities">
+              ${activities.map(a => `
+                <div class="activity-item">
+                  <div class="dot"></div>
+                  <div class="content">
+                    <div class="title">${escapeHtml(a.title)}</div>
+                    ${a.note ? `<div class="note">${escapeHtml(a.note)}</div>` : ''}
+                  </div>
+                  <div class="activity-actions">
+                    <button class="edit" onclick="openEditActivityForm('${trip.id}','${place.id}','${a.id}')">Bearbeiten</button>
+                    <button class="remove" onclick="removeActivity('${trip.id}','${place.id}','${a.id}')">Entfernen</button>
+                  </div>
+                </div>
+              `).join('')}
+              <button class="add-btn" onclick="openNewActivityForm('${trip.id}','${place.id}')">+ Aktivität hinzufügen</button>
+            </div>
+          </div>
         </div>
-      </div>
-    `;
-  });
+      `;
+    });
+  }
 
+  html += `<button class="add-btn" onclick="openNewPlaceForm()">+ Ort hinzufügen</button>`;
   html += `<div style="height:30px"></div>`;
   app.innerHTML = html;
 
@@ -684,43 +760,37 @@ function initMap(trip){
   }).addTo(map);
   state.map = map;
 
-  const allStations = [];
-  Object.keys(trip.days || {}).sort().forEach(dayKey=>{
-    (trip.days[dayKey]||[]).forEach(s=>{
-      if(s.lat != null && s.lng != null){
-        allStations.push({...s, dayKey});
-      }
-    });
-  });
+  const allPlaces = sortedPlaces(trip).filter(p => p.lat != null && p.lng != null);
 
-  if(allStations.length === 0){
+  if(allPlaces.length === 0){
     map.setView([20,10], 2);
   } else {
-    const bounds = L.latLngBounds(allStations.map(s=>[s.lat,s.lng]));
+    const bounds = L.latLngBounds(allPlaces.map(p=>[p.lat,p.lng]));
     map.fitBounds(bounds, { padding:[30,30] });
   }
 
-  allStations.forEach(s=>{
-    const marker = L.marker([s.lat, s.lng], { draggable:true, icon: pinIcon('#B8863B') }).addTo(map);
-    marker.bindPopup(`<b>${escapeHtml(s.name)}</b>${s.activity?'<br>'+escapeHtml(s.activity):''}`);
+  allPlaces.forEach(p=>{
+    const marker = L.marker([p.lat, p.lng], { draggable:true, icon: pinIcon('#B8863B') }).addTo(map);
+    const activityCount = (p.activities||[]).length;
+    marker.bindPopup(`<b>${escapeHtml(p.name)}</b>${activityCount ? '<br>'+activityCount+' Aktivität'+(activityCount===1?'':'en') : ''}`);
     marker.on('dragend', (e)=>{
       const pos = e.target.getLatLng();
-      updateStationPosition(trip.id, s.dayKey, s.id, pos.lat, pos.lng);
+      updatePlacePosition(trip.id, p.id, pos.lat, pos.lng);
     });
   });
 
-  if(allStations.length > 1){
-    L.polyline(allStations.map(s=>[s.lat,s.lng]), { color:'#B8863B', weight:3, opacity:.7, dashArray:'6,6' }).addTo(map);
+  if(allPlaces.length > 1){
+    L.polyline(allPlaces.map(p=>[p.lat,p.lng]), { color:'#B8863B', weight:3, opacity:.7, dashArray:'6,6' }).addTo(map);
   }
 
   map.on('click', (e)=>{
     if(!state.placing) return;
     if(state.placing.mode === 'update'){
-      const { tripId, dayKey, stationId } = state.placing;
-      updateStationPosition(tripId, dayKey, stationId, e.latlng.lat, e.latlng.lng);
+      const { tripId, placeId } = state.placing;
+      updatePlacePosition(tripId, placeId, e.latlng.lat, e.latlng.lng);
     } else {
-      const { tripId, dayKey, stationDraft } = state.placing;
-      addStationWithPosition(tripId, dayKey, stationDraft, e.latlng.lat, e.latlng.lng);
+      const { tripId, placeDraft } = state.placing;
+      addPlace(tripId, placeDraft, e.latlng.lat, e.latlng.lng);
     }
     state.placing = null;
     render();
@@ -756,15 +826,14 @@ function initListMap(){
   state.trips.forEach((trip, i) => {
     const color = TRIP_COLORS[i % TRIP_COLORS.length];
     const tripPoints = [];
-    Object.keys(trip.days || {}).sort().forEach(dayKey=>{
-      (trip.days[dayKey]||[]).forEach(s=>{
-        if(s.lat != null && s.lng != null){
-          tripPoints.push([s.lat, s.lng]);
-          allPoints.push([s.lat, s.lng]);
-          const marker = L.marker([s.lat, s.lng], { draggable:false, icon: pinIcon(color) }).addTo(map);
-          marker.bindPopup(`<b>${escapeHtml(trip.name)}</b><br>${escapeHtml(s.name)}${s.activity?' — '+escapeHtml(s.activity):''}`);
-        }
-      });
+    sortedPlaces(trip).forEach(p=>{
+      if(p.lat != null && p.lng != null){
+        tripPoints.push([p.lat, p.lng]);
+        allPoints.push([p.lat, p.lng]);
+        const activityCount = (p.activities||[]).length;
+        const marker = L.marker([p.lat, p.lng], { draggable:false, icon: pinIcon(color) }).addTo(map);
+        marker.bindPopup(`<b>${escapeHtml(trip.name)}</b><br>${escapeHtml(p.name)}${activityCount ? ' — '+activityCount+' Aktivität'+(activityCount===1?'':'en') : ''}`);
+      }
     });
     if(tripPoints.length > 1){
       L.polyline(tripPoints, { color, weight:2.5, opacity:.6, dashArray:'5,7' }).addTo(map);
@@ -792,7 +861,7 @@ function goList(){
 function openTrip(id){
   state.view = 'trip';
   state.currentTripId = id;
-  state.openDay = null;
+  state.openPlace = null;
   render();
 }
 
@@ -826,7 +895,7 @@ function submitNewTrip(){
     if(from > to){ alert('Das „Bis"-Datum muss nach dem „Von"-Datum liegen.'); return; }
 
     const name = countries.join(', ');
-    const trip = { id: uid(), name, dateFrom: from, dateTo: to, notes, countries, days:{} };
+    const trip = { id: uid(), name, dateFrom: from, dateTo: to, notes, countries, places:[] };
     state.trips.push(trip);
     closeSheet();
     saveTrips();
@@ -886,46 +955,51 @@ function onNotesInput(val){
   window._notesTimer = setTimeout(saveTrips, 500);
 }
 
-// ---------- actions: days / stations ----------
-function toggleDay(dayKey){
-  state.openDay = state.openDay === dayKey ? null : dayKey;
+// ---------- actions: Orte ----------
+function togglePlace(placeId){
+  state.openPlace = state.openPlace === placeId ? null : placeId;
   render();
 }
 
-function openNewStationForm(dayKey){
+function openNewPlaceForm(){
   showSheet(`
-    <h3>Station hinzufügen — ${fmtDate(dayKey)}</h3>
-    <div class="field"><label>Ort</label><input id="s_name" placeholder="z.B. Kapstadt"></div>
-    <div class="field"><label>Tätigkeit (Titel)</label><input id="s_activity" placeholder="z.B. Kap der guten Hoffnung"></div>
-    <div class="field"><label>Bemerkung</label><textarea id="s_note" rows="4" placeholder="z.B. über Ostseite hinfahren, um 9 Uhr los, Rückweg bis 17 Uhr an der XY-Straße…"></textarea></div>
+    <h3>Neuer Ort</h3>
+    <div class="field"><label>Name</label><input id="p_name" placeholder="z.B. Kapstadt"></div>
+    <div class="row2">
+      <div class="field"><label>Ankunft (optional)</label><input id="p_arrival" type="date"></div>
+      <div class="field"><label>Abreise (optional)</label><input id="p_departure" type="date"></div>
+    </div>
+    <div class="field"><label>Notizen (optional)</label><textarea id="p_note" rows="3" placeholder="z.B. Unterkunft, Anreise-Infos…"></textarea></div>
     <div class="sheet-actions">
-      <button class="secondary" onclick="submitNewStationNoPosition('${dayKey}')">Ohne Position speichern</button>
-      <button class="primary" onclick="submitNewStation('${dayKey}')">Auf Karte platzieren</button>
+      <button class="secondary" onclick="submitNewPlaceNoPosition()">Ohne Position speichern</button>
+      <button class="primary" onclick="submitNewPlace()">Auf Karte platzieren</button>
     </div>
   `);
 }
 
-function readStationFields(){
-  const name = document.getElementById('s_name').value.trim();
-  const activity = document.getElementById('s_activity').value.trim();
-  const note = document.getElementById('s_note').value.trim();
-  if(!name){ alert('Bitte einen Ort angeben.'); return null; }
-  return { name, activity, note };
+function readPlaceFields(idPrefix){
+  const name = document.getElementById(idPrefix+'name').value.trim();
+  const arrival = document.getElementById(idPrefix+'arrival').value || null;
+  const departure = document.getElementById(idPrefix+'departure').value || null;
+  const note = document.getElementById(idPrefix+'note').value.trim();
+  if(!name){ alert('Bitte einen Namen für den Ort angeben.'); return null; }
+  if(arrival && departure && departure < arrival){ alert('Die Abreise muss nach der Ankunft liegen.'); return null; }
+  return { name, arrival, departure, note };
 }
 
-function submitNewStationNoPosition(dayKey){
-  const draft = readStationFields();
+function submitNewPlaceNoPosition(){
+  const draft = readPlaceFields('p_');
   if(!draft) return;
   closeSheet();
-  addStationWithPosition(state.currentTripId, dayKey, draft, null, null);
+  addPlace(state.currentTripId, draft, null, null);
   render();
 }
 
-function submitNewStation(dayKey){
-  const draft = readStationFields();
+function submitNewPlace(){
+  const draft = readPlaceFields('p_');
   if(!draft) return;
   closeSheet();
-  state.placing = { tripId: state.currentTripId, dayKey, mode:'create', stationDraft: draft };
+  state.placing = { tripId: state.currentTripId, mode:'create', placeDraft: draft };
   render();
   window.scrollTo({top:0, behavior:'smooth'});
 }
@@ -935,75 +1009,81 @@ function cancelPlacing(){
   render();
 }
 
-function startPlacingExisting(tripId, dayKey, stationId, stationName){
-  state.placing = { tripId, dayKey, mode:'update', stationId, stationName };
+function startPlacingExistingPlace(tripId, placeId, placeName){
+  state.placing = { tripId, mode:'update', placeId, placeName };
   render();
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
-function addStationWithPosition(tripId, dayKey, draft, lat, lng){
+function addPlace(tripId, draft, lat, lng){
   try{
     const trip = getTrip(tripId);
     if(!trip) return;
-    if(!trip.days[dayKey]) trip.days[dayKey] = [];
-    trip.days[dayKey].push({ id: uid(), name: draft.name, activity: draft.activity, note: draft.note || '', lat, lng });
-    state.openDay = dayKey;
+    if(!trip.places) trip.places = [];
+    const place = { id: uid(), name: draft.name, arrival: draft.arrival, departure: draft.departure, note: draft.note || '', lat, lng, activities: [] };
+    trip.places.push(place);
+    state.openPlace = place.id;
     saveTrips();
-    showToast('„' + draft.name + '" wurde platziert.');
+    showToast('„' + draft.name + '" wurde hinzugefügt.');
   }catch(e){
     console.error(e);
-    showToast('Station konnte nicht gespeichert werden: ' + e.message);
+    showToast('Ort konnte nicht gespeichert werden: ' + e.message);
   }
 }
 
-function updateStationPosition(tripId, dayKey, stationId, lat, lng){
+function updatePlacePosition(tripId, placeId, lat, lng){
   try{
     const trip = getTrip(tripId);
     if(!trip) return;
-    const s = (trip.days[dayKey]||[]).find(x=>x.id===stationId);
-    if(s){ s.lat = lat; s.lng = lng; saveTrips(); }
+    const p = (trip.places||[]).find(x=>x.id===placeId);
+    if(p){ p.lat = lat; p.lng = lng; saveTrips(); }
   }catch(e){
     console.error(e);
     showToast('Position konnte nicht aktualisiert werden: ' + e.message);
   }
 }
 
-function removeStation(tripId, dayKey, stationId){
+function removePlace(tripId, placeId){
   const trip = getTrip(tripId);
   if(!trip) return;
-  trip.days[dayKey] = (trip.days[dayKey]||[]).filter(s=>s.id!==stationId);
+  trip.places = (trip.places||[]).filter(p=>p.id!==placeId);
+  if(state.openPlace === placeId) state.openPlace = null;
   saveTrips();
   render();
 }
 
-function openEditStationForm(tripId, dayKey, stationId){
+function openEditPlaceForm(tripId, placeId){
   const trip = getTrip(tripId);
   if(!trip) return;
-  const s = (trip.days[dayKey]||[]).find(x=>x.id===stationId);
-  if(!s) return;
+  const p = (trip.places||[]).find(x=>x.id===placeId);
+  if(!p) return;
   showSheet(`
-    <h3>Station bearbeiten — ${fmtDate(dayKey)}</h3>
-    <div class="field"><label>Ort</label><input id="e_name" value="${escapeHtml(s.name)}"></div>
-    <div class="field"><label>Tätigkeit (Titel)</label><input id="e_activity" value="${escapeHtml(s.activity||'')}"></div>
-    <div class="field"><label>Bemerkung</label><textarea id="e_note" rows="4">${escapeHtml(s.note||'')}</textarea></div>
+    <h3>Ort bearbeiten</h3>
+    <div class="field"><label>Name</label><input id="ep_name" value="${escapeHtml(p.name)}"></div>
+    <div class="row2">
+      <div class="field"><label>Ankunft (optional)</label><input id="ep_arrival" type="date" value="${p.arrival||''}"></div>
+      <div class="field"><label>Abreise (optional)</label><input id="ep_departure" type="date" value="${p.departure||''}"></div>
+    </div>
+    <div class="field"><label>Notizen (optional)</label><textarea id="ep_note" rows="3">${escapeHtml(p.note||'')}</textarea></div>
     <div class="sheet-actions">
       <button class="secondary" onclick="closeSheet()">Abbrechen</button>
-      <button class="primary" onclick="submitEditStation('${tripId}','${dayKey}','${stationId}')">Speichern</button>
+      <button class="primary" onclick="submitEditPlace('${tripId}','${placeId}')">Speichern</button>
     </div>
   `);
 }
 
-function submitEditStation(tripId, dayKey, stationId){
+function submitEditPlace(tripId, placeId){
   try{
     const trip = getTrip(tripId);
     if(!trip) return;
-    const s = (trip.days[dayKey]||[]).find(x=>x.id===stationId);
-    if(!s) return;
-    const name = document.getElementById('e_name').value.trim();
-    if(!name){ alert('Bitte einen Ort angeben.'); return; }
-    s.name = name;
-    s.activity = document.getElementById('e_activity').value.trim();
-    s.note = document.getElementById('e_note').value.trim();
+    const p = (trip.places||[]).find(x=>x.id===placeId);
+    if(!p) return;
+    const draft = readPlaceFields('ep_');
+    if(!draft) return;
+    p.name = draft.name;
+    p.arrival = draft.arrival;
+    p.departure = draft.departure;
+    p.note = draft.note;
     closeSheet();
     saveTrips();
     render();
@@ -1011,6 +1091,89 @@ function submitEditStation(tripId, dayKey, stationId){
     console.error(e);
     showToast('Änderung konnte nicht gespeichert werden: ' + e.message);
   }
+}
+
+// ---------- actions: Aktivitäten ----------
+function openNewActivityForm(tripId, placeId){
+  showSheet(`
+    <h3>Aktivität hinzufügen</h3>
+    <div class="field"><label>Titel</label><input id="a_title" placeholder="z.B. Tafelberg Wanderung"></div>
+    <div class="field"><label>Notiz (optional)</label><textarea id="a_note" rows="4" placeholder="z.B. Seilbahn um 9 Uhr, Rückweg zu Fuß…"></textarea></div>
+    <div class="sheet-actions">
+      <button class="secondary" onclick="closeSheet()">Abbrechen</button>
+      <button class="primary" onclick="submitNewActivity('${tripId}','${placeId}')">Hinzufügen</button>
+    </div>
+  `);
+}
+
+function submitNewActivity(tripId, placeId){
+  try{
+    const title = document.getElementById('a_title').value.trim();
+    if(!title){ alert('Bitte einen Titel angeben.'); return; }
+    const note = document.getElementById('a_note').value.trim();
+    const trip = getTrip(tripId);
+    if(!trip) return;
+    const p = (trip.places||[]).find(x=>x.id===placeId);
+    if(!p) return;
+    if(!p.activities) p.activities = [];
+    p.activities.push({ id: uid(), title, note });
+    closeSheet();
+    state.openPlace = placeId;
+    saveTrips();
+    render();
+  }catch(e){
+    console.error(e);
+    showToast('Aktivität konnte nicht gespeichert werden: ' + e.message);
+  }
+}
+
+function openEditActivityForm(tripId, placeId, activityId){
+  const trip = getTrip(tripId);
+  if(!trip) return;
+  const p = (trip.places||[]).find(x=>x.id===placeId);
+  if(!p) return;
+  const a = (p.activities||[]).find(x=>x.id===activityId);
+  if(!a) return;
+  showSheet(`
+    <h3>Aktivität bearbeiten</h3>
+    <div class="field"><label>Titel</label><input id="ea_title" value="${escapeHtml(a.title)}"></div>
+    <div class="field"><label>Notiz (optional)</label><textarea id="ea_note" rows="4">${escapeHtml(a.note||'')}</textarea></div>
+    <div class="sheet-actions">
+      <button class="secondary" onclick="closeSheet()">Abbrechen</button>
+      <button class="primary" onclick="submitEditActivity('${tripId}','${placeId}','${activityId}')">Speichern</button>
+    </div>
+  `);
+}
+
+function submitEditActivity(tripId, placeId, activityId){
+  try{
+    const trip = getTrip(tripId);
+    if(!trip) return;
+    const p = (trip.places||[]).find(x=>x.id===placeId);
+    if(!p) return;
+    const a = (p.activities||[]).find(x=>x.id===activityId);
+    if(!a) return;
+    const title = document.getElementById('ea_title').value.trim();
+    if(!title){ alert('Bitte einen Titel angeben.'); return; }
+    a.title = title;
+    a.note = document.getElementById('ea_note').value.trim();
+    closeSheet();
+    saveTrips();
+    render();
+  }catch(e){
+    console.error(e);
+    showToast('Änderung konnte nicht gespeichert werden: ' + e.message);
+  }
+}
+
+function removeActivity(tripId, placeId, activityId){
+  const trip = getTrip(tripId);
+  if(!trip) return;
+  const p = (trip.places||[]).find(x=>x.id===placeId);
+  if(!p) return;
+  p.activities = (p.activities||[]).filter(a=>a.id!==activityId);
+  saveTrips();
+  render();
 }
 
 // ---------- sheet (modal) ----------
@@ -1032,9 +1195,10 @@ function closeSheet(){
 // expose functions used inline
 Object.assign(window, {
   goList, openTrip, openNewTripForm, submitNewTrip, onNotesInput,
-  toggleDay, openNewStationForm, submitNewStation, submitNewStationNoPosition, cancelPlacing,
-  removeStation, closeSheet, openEditStationForm, submitEditStation,
-  switchTab, openEditTripForm, submitEditTrip, startPlacingExisting
+  togglePlace, openNewPlaceForm, submitNewPlace, submitNewPlaceNoPosition, cancelPlacing,
+  removePlace, closeSheet, openEditPlaceForm, submitEditPlace, startPlacingExistingPlace,
+  openNewActivityForm, submitNewActivity, openEditActivityForm, submitEditActivity, removeActivity,
+  switchTab, openEditTripForm, submitEditTrip
 });
 
 checkAccess();

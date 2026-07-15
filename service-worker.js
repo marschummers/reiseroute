@@ -1,6 +1,6 @@
 // Bei jeder inhaltlichen Änderung an der App die Versionsnummer erhöhen,
 // damit Nutzer:innen die neue Version bekommen (alte Caches werden dann verworfen).
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const APP_CACHE = `reiseroute-app-${CACHE_VERSION}`;
 const TILE_CACHE = 'reiseroute-tiles';
 

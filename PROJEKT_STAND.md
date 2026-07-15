@@ -7,17 +7,30 @@ im Repo — die aktive App ist jetzt **`index.html`** (PWA-Umbau, siehe unten).
 
 ## Was die App aktuell kann
 - Reisen anlegen: Land/Länder (kommagetrennt, ersetzt "Name der Reise"), Von/Bis-Datum, Notizen
-- Pro Tag der Reise: Stationen anlegen (Ort, Tätigkeit als Titel, mehrzeilige Bemerkung)
-- Marker auf Karte (Leaflet + OpenStreetMap) sind OPTIONAL — Station kann ohne Position gespeichert
-  und später über einen Button nachträglich platziert werden
+- Pro Reise: **Orte** anlegen (Name, optionale Ankunft/Abreise, optionale Notiz), jeder Ort kann
+  mehrere **Aktivitäten** enthalten (Titel + optionale mehrzeilige Bemerkung). Orte werden als
+  Liste angezeigt, sortiert nach Ankunftsdatum (Orte ohne Datum stehen am Ende). Frühere
+  Tages-Gliederung (Tag 1, Tag 2, …) wurde durch dieses Orte/Aktivitäten-Modell ersetzt.
+- Marker auf Karte (Leaflet + OpenStreetMap) sind pro Ort OPTIONAL — Ort kann ohne Position
+  gespeichert und später über einen Button nachträglich platziert werden
 - Marker sind eigene Inline-SVG-Pins (kein externes Icon-Bild, das war ein früherer Bug)
-- Stationen bearbeitbar (Ort/Tätigkeit/Bemerkung), Reisen bearbeitbar (Länder/Daten/Notizen)
+- Orte und Aktivitäten bearbeitbar, Reisen bearbeitbar (Länder/Daten/Notizen)
 - Zwei Tabs: "Reisen" (Liste + Detail) und "Besuchte Länder" (aggregiert aus trip.countries,
   zeigt Datum der jeweils AKTUELLSTEN Reise pro Land, Gesamtzahl der Länder)
 - Übersichtskarte auf der Startseite: alle Reisen, unterschiedliche Farbe pro Reise, nur Ansicht
   (nicht editierbar, kein Klick-Handler)
 - Passwortschutz: Login-Screen vor der App, Passwort "Jackyy", nach korrekter Eingabe merkt sich
   das Gerät den Zugang
+
+### Datenmodell (index.html)
+```
+Trip { id, name, dateFrom, dateTo, notes, countries[], places: [Place] }
+Place { id, name, arrival (Datum|null), departure (Datum|null), note, lat, lng, activities: [Activity] }
+Activity { id, title, note }
+```
+Alte, bereits gespeicherte Reisen im Vorgänger-Format (`trip.days = {date: [Station]}`) werden
+beim Laden automatisch nach `trip.places` migriert (`migrateTripIfNeeded()` in `index.html`) —
+keine Daten gehen dabei verloren, jede Station wird zu einem Ort mit einer Aktivität.
 
 ## PWA-Umbau — Status: fertig, lokal getestet
 Ziel-Architektur (mit Nutzer abgestimmt): Alle Daten NUR lokal auf dem iPhone (kein Server,
