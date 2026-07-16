@@ -12,6 +12,12 @@ im Repo — die aktive App ist jetzt **`index.html`** (PWA-Umbau, siehe unten).
   mehrere **Aktivitäten** enthalten (Name + optionales Datum/Uhrzeit + optionale Bemerkung). Orte
   werden als Liste angezeigt, sortiert nach Ankunftsdatum (Orte ohne Datum stehen am Ende).
   Frühere Tages-Gliederung (Tag 1, Tag 2, …) wurde durch dieses Orte/Aktivitäten-Modell ersetzt.
+- In der Reise-Detailansicht Umschalter **"Nach Ort" (Standard) / "Nach Tag"**: Tagesansicht
+  zeigt für jeden Kalendertag der Reise, welche(r) Ort(e) an dem Tag belegt sind (aus
+  Ankunft/Abreise) und welche Aktivitäten an dem Tag ein Datum haben, chronologisch über alle
+  Orte hinweg — praktisch, um unterwegs zu checken "was steht heute an". Tage ganz ohne Ort/
+  Aktivität werden übersprungen; Aktivitäten ohne eigenes Datum erscheinen hier bewusst nicht
+  (nur in der Orts-Ansicht). Beim erneuten Öffnen einer Reise ist immer wieder "Nach Ort" aktiv.
 - Pro Ort: **Fotos** anhängen (Kamera/Fotomediathek über den nativen iOS-Dialog), werden lokal in
   IndexedDB gespeichert (nicht im Trips-JSON) und beim Hochladen automatisch verkleinert.
 - Marker auf Karte (Leaflet + OpenStreetMap) sind pro Ort OPTIONAL — Ort kann ohne Position
