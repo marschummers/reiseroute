@@ -274,6 +274,17 @@
   .photo-add:hover{border-color:var(--teal);}
   .photo-add input{display:none;}
 
+  .photo-preview-row{display:flex;gap:8px;margin-top:8px;cursor:pointer;}
+  .photo-thumb-sm{
+    width:56px;height:56px;border-radius:8px;overflow:hidden;
+    background:#EFEAE0;border:1px solid var(--line);flex-shrink:0;
+  }
+  .photo-thumb-sm img{width:100%;height:100%;object-fit:cover;display:block;}
+  .photo-add-sm{
+    width:56px;height:56px;border-radius:8px;border:1.5px dashed var(--line);flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;color:var(--teal);font-size:20px;
+  }
+
   .lightbox{
     position:fixed;inset:0;background:rgba(10,14,20,.92);z-index:3000;
     display:flex;align-items:center;justify-content:center;padding:24px;
@@ -1010,6 +1021,31 @@ function renderList(app){
   if(hasAnyPlace) initListMap();
 }
 
+// Kompakte Vorschau: bis zu 3 Thumbnails + "+". Tippen darauf öffnet immer die volle Galerie
+// (bei noch keinem Foto direkt den Datei-Auswahldialog, da es dort noch nichts zu zeigen gibt).
+function photoPreviewHtml(trip, place){
+  const ids = place.photoIds || [];
+  if(ids.length === 0){
+    return `
+      <div class="photos">
+        <div class="overview-label" style="margin:0 0 4px;">Fotos</div>
+        <label class="photo-add">
+          <input type="file" accept="image/*" multiple onchange="onPhotoFilesSelected(event,'${trip.id}','${place.id}')">
+          <span>+</span>
+        </label>
+      </div>`;
+  }
+  const preview = ids.slice(0, 3);
+  return `
+    <div class="photos">
+      <div class="overview-label" style="margin:0 0 4px;">Fotos</div>
+      <div class="photo-preview-row" id="photo-preview-${place.id}" onclick="openPhotoGallery('${trip.id}','${place.id}')">
+        ${preview.map(photoId => `<div class="photo-thumb-sm" data-photo-id="${photoId}"><img alt=""></div>`).join('')}
+        <div class="photo-add-sm">+</div>
+      </div>
+    </div>`;
+}
+
 function renderTrip(app, trip){
   const places = sortedPlaces(trip);
   let html = `
@@ -1049,6 +1085,7 @@ function renderTrip(app, trip){
             <div class="place-actions">
               <button class="menu-btn" onclick="openPlaceMenu('${trip.id}','${place.id}')">•••</button>
             </div>
+            ${photoPreviewHtml(trip, place)}
             <div class="activities">
               ${sortedActivities(place).map(a => `
                 <div class="activity-item">
@@ -1064,21 +1101,6 @@ function renderTrip(app, trip){
                 </div>
               `).join('')}
               <button class="add-btn" onclick="openNewActivityForm('${trip.id}','${place.id}')">+ Aktivität hinzufügen</button>
-            </div>
-            <div class="photos">
-              <div class="overview-label" style="margin:0 0 4px;">Fotos</div>
-              <div class="photo-grid" id="photos-${place.id}">
-                ${(place.photoIds||[]).map(photoId => `
-                  <div class="photo-thumb" data-photo-id="${photoId}">
-                    <img alt="" onclick="openLightboxForPhoto('${photoId}')">
-                    <button class="photo-remove" onclick="event.stopPropagation();removePhoto('${trip.id}','${place.id}','${photoId}')">✕</button>
-                  </div>
-                `).join('')}
-                <label class="photo-add">
-                  <input type="file" accept="image/*" multiple onchange="onPhotoFilesSelected(event,'${trip.id}','${place.id}')">
-                  <span>+</span>
-                </label>
-              </div>
             </div>
           </div>
         </div>
@@ -1775,49 +1797,100 @@ async function onPhotoFilesSelected(event, tripId, placeId){
       place.photoIds.push(id);
     }
     saveTrips();
-    render();
+    // Falls die Foto-Galerie gerade offen ist (Foto von dort aus hinzugefügt), diese mit dem
+    // neuen Stand neu aufbauen, statt den ganzen Hintergrund zu rendern (Galerie ist ein Sheet
+    // außerhalb von #app und würde von render() sonst unverändert stehen bleiben).
+    if(document.querySelector('.overlay .photo-grid')){
+      openPhotoGallery(tripId, placeId);
+    } else {
+      render();
+    }
   }catch(e){
     console.error(e);
     showToast('Foto konnte nicht gespeichert werden: ' + e.message);
   }
 }
 
-async function removePhoto(tripId, placeId, photoId){
+async function removePhotoFromGallery(tripId, placeId, photoId){
   const trip = getTrip(tripId);
   if(!trip) return;
   const place = (trip.places||[]).find(p=>p.id===placeId);
   if(!place) return;
   place.photoIds = (place.photoIds||[]).filter(id=>id!==photoId);
   try{ await photoStorage.remove(photoId); }catch(e){ console.error(e); }
-  closeLightbox();
+  delete photoObjectUrls[photoId];
   saveTrips();
-  render();
+  if(place.photoIds.length === 0){
+    closeSheet();
+    render();
+  } else {
+    openPhotoGallery(tripId, placeId);
+  }
 }
 
-// object URLs der aktuell angezeigten Fotos — werden bei jedem Rendern neu aufgebaut
-// und die alten dabei freigegeben, damit der Speicher nicht volläuft.
+// object URLs bereits geladener Fotos. Werden bewusst NICHT laufend wieder freigegeben:
+// Vorschau-Kacheln und Galerie teilen sich diesen Cache, und die paar Dutzend Fotos, die in
+// einer Sitzung realistisch angesehen werden, sind speichertechnisch vernachlässigbar — der
+// Browser räumt beim Neuladen der Seite ohnehin auf.
 const photoObjectUrls = {};
 
-function renderAllPlacePhotos(trip){
-  Object.values(photoObjectUrls).forEach(url => URL.revokeObjectURL(url));
-  for(const key in photoObjectUrls) delete photoObjectUrls[key];
+async function getPhotoUrl(photoId){
+  if(photoObjectUrls[photoId]) return photoObjectUrls[photoId];
+  const blob = await photoStorage.getBlob(photoId);
+  if(!blob) return null;
+  const url = URL.createObjectURL(blob);
+  photoObjectUrls[photoId] = url;
+  return url;
+}
 
+// Lädt nur die ersten 3 (in der Ort-Karte sichtbaren) Vorschaubilder je Ort.
+function renderAllPlacePhotos(trip){
   (trip.places||[]).forEach(place=>{
-    const grid = document.getElementById('photos-' + place.id);
-    if(!grid) return;
-    (place.photoIds||[]).forEach(async (photoId)=>{
-      try{
-        const blob = await photoStorage.getBlob(photoId);
-        if(!blob) return;
-        const url = URL.createObjectURL(blob);
-        photoObjectUrls[photoId] = url;
-        const img = grid.querySelector(`[data-photo-id="${photoId}"] img`);
-        if(img) img.src = url;
-      }catch(e){
-        console.error('Foto konnte nicht geladen werden:', e);
-      }
+    const row = document.getElementById('photo-preview-' + place.id);
+    if(!row) return;
+    (place.photoIds||[]).slice(0, 3).forEach(async (photoId)=>{
+      const url = await getPhotoUrl(photoId);
+      if(!url) return;
+      const img = row.querySelector(`[data-photo-id="${photoId}"] img`);
+      if(img) img.src = url;
     });
   });
+}
+
+// Lädt alle Fotos eines Orts in die gerade geöffnete Galerie (Sheet).
+async function renderGalleryPhotos(place){
+  const grid = document.querySelector('.overlay .photo-grid');
+  if(!grid) return;
+  (place.photoIds||[]).forEach(async (photoId)=>{
+    const url = await getPhotoUrl(photoId);
+    if(!url) return;
+    const img = grid.querySelector(`[data-photo-id="${photoId}"] img`);
+    if(img) img.src = url;
+  });
+}
+
+function openPhotoGallery(tripId, placeId){
+  const trip = getTrip(tripId);
+  const place = trip && (trip.places||[]).find(p=>p.id===placeId);
+  if(!place) return;
+  const ids = place.photoIds || [];
+  showSheet(`
+    <h3>Fotos — ${escapeHtml(place.name)}</h3>
+    <div class="photo-grid">
+      ${ids.map(photoId => `
+        <div class="photo-thumb" data-photo-id="${photoId}">
+          <img alt="" onclick="openLightboxForPhoto('${photoId}')">
+          <button class="photo-remove" onclick="event.stopPropagation();removePhotoFromGallery('${tripId}','${placeId}','${photoId}')">✕</button>
+        </div>
+      `).join('')}
+      <label class="photo-add">
+        <input type="file" accept="image/*" multiple onchange="onPhotoFilesSelected(event,'${tripId}','${placeId}')">
+        <span>+</span>
+      </label>
+    </div>
+    <button class="secondary" style="width:100%;margin-top:14px;" onclick="closeSheet();render();">Schließen</button>
+  `);
+  renderGalleryPhotos(place);
 }
 
 function openLightboxForPhoto(photoId){
@@ -1865,7 +1938,7 @@ Object.assign(window, {
   switchTab, openEditTripForm, submitEditTrip,
   removeCountryChip, onCountryInput, onCountryInputKeydown, selectCountryMatch,
   openNewWishlistForm, submitNewWishlist, openEditWishlistForm, submitEditWishlist, removeWishlistItem,
-  onPhotoFilesSelected, removePhoto, openLightboxForPhoto, closeLightbox,
+  onPhotoFilesSelected, removePhotoFromGallery, openPhotoGallery, openLightboxForPhoto, closeLightbox,
   openPlaceMenu, openActivityMenu, openWishlistMenu
 });
 
