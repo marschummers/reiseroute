@@ -144,16 +144,26 @@
   .sheet{
     background:var(--card);width:100%;max-width:720px;border-radius:16px 16px 0 0;
     padding:22px 20px calc(20px + env(safe-area-inset-bottom));
-    max-height:88vh;overflow-y:auto;
+    max-height:88vh;overflow-y:auto;overflow-x:hidden;
+    box-sizing:border-box;
   }
   .sheet h3{margin:0 0 16px;font-size:18px;}
   .field{margin-bottom:14px;}
   .field label{display:block;font-size:12.5px;font-weight:600;color:var(--text-soft);margin-bottom:5px;}
   .field input, .field textarea{
-    width:100%;min-width:0;box-sizing:border-box;border:1.5px solid var(--line);border-radius:8px;
+    display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;
+    border:1.5px solid var(--line);border-radius:8px;
     padding:10px 12px;font-size:15px;font-family:inherit;background:#fff;color:var(--text);
   }
   .field input:focus, .field textarea:focus{outline:none;border-color:var(--teal);}
+  /* iOS Safari ignoriert bei input[type=date/time] im leeren Zustand teils die CSS-Breite und
+     rendert das native Steuerelement breiter als der Container (Overflow rechts aus dem Bild).
+     -webkit-appearance:none erzwingt normales Box-Modell-Verhalten; Antippen öffnet weiterhin
+     den nativen Datum/Uhrzeit-Picker, nur die native Kalender-Optik entfällt dabei. */
+  .field input[type="date"], .field input[type="time"]{
+    -webkit-appearance:none;
+    appearance:none;
+  }
   .sheet-actions{display:flex;gap:10px;margin-top:6px;}
   .sheet-actions button{flex:1;}
 
