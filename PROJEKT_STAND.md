@@ -22,11 +22,14 @@ im Repo — die aktive App ist jetzt **`index.html`** (PWA-Umbau, siehe unten).
   bewusst OHNE Datum — für "das will ich irgendwann noch bereisen", getrennt von den konkret
   geplanten/vergangenen Reisen mit Datum.
 - Drei Tabs: "Reisen" (Liste + Detail), "Wunschliste", "Besuchte Länder" (aggregiert aus
-  trip.countries, zeigt Datum der jeweils AKTUELLSTEN Reise pro Land, Gesamtzahl der Länder)
+  trip.countries, zeigt Datum der jeweils AKTUELLSTEN Reise pro Land, Gesamtzahl der Länder,
+  plus Weltkarte mit in Messing eingefärbten besuchten Ländern)
 - Übersichtskarte auf der Startseite: alle Reisen, unterschiedliche Farbe pro Reise, nur Ansicht
   (nicht editierbar, kein Klick-Handler)
-- Passwortschutz: Login-Screen vor der App, Passwort "Jackyy", nach korrekter Eingabe merkt sich
-  das Gerät den Zugang
+- Kein Passwortschutz (mehr) — die App wurde ursprünglich mit einem simplen Passwort-Gate
+  ausgeliefert, das aber ohnehin keine echte Sicherheit bot (Passwort stand im Klartext im
+  JS-Quelltext). Da alle Daten sowieso nur lokal auf dem Gerät liegen, wurde der Login-Screen auf
+  Wunsch entfernt — die App öffnet jetzt direkt in der Reisenliste.
 
 ### Datenmodell (index.html)
 ```

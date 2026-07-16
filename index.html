@@ -305,24 +305,6 @@
   .loading, .error-box{text-align:center;padding:40px;color:var(--text-soft);}
   .pin-icon{background:none;border:none;}
 
-  .login-screen{
-    min-height:100vh;display:flex;align-items:center;justify-content:center;
-    background:var(--ink);padding:20px;
-  }
-  .login-box{
-    background:var(--card);border-radius:14px;padding:32px 26px;max-width:340px;width:100%;
-    text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.3);
-  }
-  .login-box .icon{font-size:34px;margin-bottom:10px;}
-  .login-box h2{margin:0 0 6px;font-size:19px;color:var(--ink);}
-  .login-box p{margin:0 0 18px;font-size:13px;color:var(--text-soft);}
-  .login-box input{
-    width:100%;border:1.5px solid var(--line);border-radius:8px;padding:12px 14px;
-    font-size:16px;text-align:center;margin-bottom:12px;font-family:inherit;
-  }
-  .login-box input:focus{outline:none;border-color:var(--teal);}
-  .login-box .err{color:var(--danger);font-size:13px;margin-bottom:10px;min-height:16px;}
-
   .country-stat{
     text-align:center;padding:22px 10px 26px;
   }
@@ -377,8 +359,6 @@
 
 <script>
 const STORAGE_KEY = 'trips';
-const ACCESS_KEY = 'access_unlocked';
-const ACCESS_PASSWORD = 'Jackyy';
 const WISHLIST_KEY = 'wishlist';
 
 // ---------- lokale Datenspeicherung (IndexedDB) ----------
@@ -468,57 +448,6 @@ const photoStorage = {
     });
   }
 };
-
-let unlocked = false;
-
-async function checkAccess(){
-  try{
-    const res = await storage.get(ACCESS_KEY);
-    if(res && res.value === 'true'){
-      unlocked = true;
-    }
-  }catch(e){
-    // kein gespeicherter Zugang vorhanden -> Login zeigen
-  }
-  if(unlocked){
-    loadTrips();
-  }else{
-    renderLogin();
-  }
-}
-
-function renderLogin(errMsg){
-  document.getElementById('headerContent').innerHTML = '';
-  document.getElementById('pickerBanner').innerHTML = '';
-  document.getElementById('app').innerHTML = `
-    <div class="login-screen">
-      <div class="login-box">
-        <div class="icon">🔒</div>
-        <h2>Reiseroute</h2>
-        <p>Bitte Passwort eingeben</p>
-        <input type="password" id="pw" placeholder="Passwort" autofocus>
-        <div class="err">${errMsg || ''}</div>
-        <button class="primary" onclick="submitPassword()">Entsperren</button>
-      </div>
-    </div>
-  `;
-  const pwField = document.getElementById('pw');
-  pwField.focus();
-  pwField.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') submitPassword(); });
-}
-
-async function submitPassword(){
-  const val = document.getElementById('pw').value;
-  if(val === ACCESS_PASSWORD){
-    unlocked = true;
-    try{ await storage.set(ACCESS_KEY, 'true'); }catch(e){}
-    loadTrips();
-  }else{
-    renderLogin('Falsches Passwort. Nochmal versuchen.');
-  }
-}
-
-Object.assign(window, { submitPassword });
 
 // Eigene Pin-Nadel als Inline-SVG statt externer Icon-Bilder (die im Sandbox-Iframe
 // nicht zuverlässig laden) — funktioniert garantiert ohne Netzwerk-Abhängigkeit.
@@ -1973,7 +1902,7 @@ Object.assign(window, {
   openPlaceMenu, openActivityMenu, openWishlistMenu
 });
 
-checkAccess();
+loadTrips();
 
 // ---------- PWA: Service Worker registrieren ----------
 if('serviceWorker' in navigator){
