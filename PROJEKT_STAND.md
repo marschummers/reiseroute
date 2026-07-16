@@ -18,6 +18,9 @@ im Repo — die aktive App ist jetzt **`index.html`** (PWA-Umbau, siehe unten).
   gespeichert und später über einen Button nachträglich platziert werden
 - Marker sind eigene Inline-SVG-Pins (kein externes Icon-Bild, das war ein früherer Bug)
 - Orte und Aktivitäten bearbeitbar, Reisen bearbeitbar (Länder/Daten/Notizen)
+- Reisen löschbar per Swipe-nach-links auf der Reisen-Karte (iOS-Standardmuster wie bei
+  Mail/Erinnerungen), mit Bestätigungsabfrage — löscht auch alle Orte, Aktivitäten und Fotos
+  dieser Reise mit (inkl. Aufräumen verwaister Foto-Blobs in IndexedDB)
 - **Wunschliste**: separate Sammlung von Ländern (+ optionale Stichwort-Orte, + optionale Notiz),
   bewusst OHNE Datum — für "das will ich irgendwann noch bereisen", getrennt von den konkret
   geplanten/vergangenen Reisen mit Datum.

@@ -77,16 +77,24 @@
   main{max-width:720px;margin:0 auto;padding:16px 16px 90px;}
 
   /* ---- Trip list ---- */
+  /* Swipe-to-delete (iOS-Standardmuster): .trip-card liegt über .trip-card-delete und wird per
+     Touch-Geste per Inline-transform nach links geschoben, um den Löschen-Button freizulegen. */
+  .trip-card-wrap{position:relative;border-radius:10px;overflow:hidden;margin-bottom:12px;}
+  .trip-card-delete{
+    position:absolute;top:0;right:0;bottom:0;width:84px;
+    background:var(--danger);color:#fff;border:none;font-size:13.5px;font-weight:600;cursor:pointer;
+  }
   .trip-card{
+    position:relative;
     background:var(--card);
     border:1px solid var(--line);
     border-radius:10px;
     padding:16px 18px;
-    margin-bottom:12px;
     cursor:pointer;
-    transition:box-shadow .15s ease, transform .15s ease;
+    touch-action:pan-y;
+    transition:box-shadow .15s ease, transform .2s ease;
   }
-  .trip-card:hover{box-shadow:0 4px 14px rgba(31,48,73,.10);transform:translateY(-1px);}
+  .trip-card:hover{box-shadow:0 4px 14px rgba(31,48,73,.10);}
   .trip-card .name{font-size:19px;font-weight:600;}
   .trip-card .dates{font-size:13px;color:var(--text-soft);margin-top:3px;}
   .trip-card .meta{font-size:12.5px;color:var(--brass);margin-top:8px;font-weight:600;}
@@ -963,10 +971,17 @@ function renderList(app){
       .forEach(t=>{
         const dayCount = dateRange(t.dateFrom, t.dateTo).length;
         html += `
-        <div class="trip-card" onclick="openTrip('${t.id}')">
-          <div class="name display">${escapeHtml(tripCountriesLabel(t))}</div>
-          <div class="dates">${fmtDateShort(t.dateFrom)} – ${fmtDateShort(t.dateTo)}</div>
-          <div class="meta">${dayCount} ${dayCount===1?'Tag':'Tage'}</div>
+        <div class="trip-card-wrap">
+          <button class="trip-card-delete" onclick="deleteTripConfirm('${t.id}')">Löschen</button>
+          <div class="trip-card" data-trip-id="${t.id}"
+            onclick="handleTripCardClick(event,'${t.id}')"
+            ontouchstart="onTripCardTouchStart(event,'${t.id}')"
+            ontouchmove="onTripCardTouchMove(event,'${t.id}')"
+            ontouchend="onTripCardTouchEnd(event,'${t.id}')">
+            <div class="name display">${escapeHtml(tripCountriesLabel(t))}</div>
+            <div class="dates">${fmtDateShort(t.dateFrom)} – ${fmtDateShort(t.dateTo)}</div>
+            <div class="meta">${dayCount} ${dayCount===1?'Tag':'Tage'}</div>
+          </div>
         </div>`;
       });
   }
@@ -1204,6 +1219,100 @@ function openTrip(id){
   state.currentTripId = id;
   state.openPlace = null;
   render();
+}
+
+// ---------- Swipe-to-delete für Reisen-Karten (iOS-Standardmuster) ----------
+const SWIPE_OPEN_X = -84;
+let swipeState = { tripId: null, startX: 0, startY: 0, baseX: 0, currentDx: 0, dragging: false, moved: false, openTripId: null };
+
+function closeOpenTripCard(){
+  if(!swipeState.openTripId) return;
+  const card = document.querySelector(`.trip-card[data-trip-id="${swipeState.openTripId}"]`);
+  if(card) card.style.transform = 'translateX(0)';
+  swipeState.openTripId = null;
+}
+
+function onTripCardTouchStart(e, tripId){
+  const wasOpenForThis = swipeState.openTripId === tripId;
+  if(swipeState.openTripId && !wasOpenForThis) closeOpenTripCard();
+  const touch = e.touches[0];
+  swipeState.tripId = tripId;
+  swipeState.startX = touch.clientX;
+  swipeState.startY = touch.clientY;
+  swipeState.baseX = wasOpenForThis ? SWIPE_OPEN_X : 0;
+  swipeState.currentDx = 0;
+  swipeState.dragging = false;
+  swipeState.moved = false;
+}
+
+function onTripCardTouchMove(e, tripId){
+  if(swipeState.tripId !== tripId) return;
+  const touch = e.touches[0];
+  const dx = touch.clientX - swipeState.startX;
+  const dy = touch.clientY - swipeState.startY;
+  swipeState.currentDx = dx;
+  if(!swipeState.dragging){
+    if(Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+    if(Math.abs(dy) > Math.abs(dx)){ swipeState.tripId = null; return; } // eher vertikal -> normal scrollen lassen
+    swipeState.dragging = true;
+  }
+  swipeState.moved = true;
+  e.preventDefault();
+  const card = document.querySelector(`.trip-card[data-trip-id="${tripId}"]`);
+  if(!card) return;
+  const translate = Math.max(SWIPE_OPEN_X, Math.min(0, swipeState.baseX + dx));
+  card.style.transform = `translateX(${translate}px)`;
+}
+
+function onTripCardTouchEnd(e, tripId){
+  if(swipeState.tripId !== tripId) return;
+  if(swipeState.dragging){
+    const card = document.querySelector(`.trip-card[data-trip-id="${tripId}"]`);
+    const finalX = Math.max(SWIPE_OPEN_X, Math.min(0, swipeState.baseX + swipeState.currentDx));
+    if(card){
+      if(finalX < SWIPE_OPEN_X / 2){
+        card.style.transform = `translateX(${SWIPE_OPEN_X}px)`;
+        swipeState.openTripId = tripId;
+      } else {
+        card.style.transform = 'translateX(0)';
+        if(swipeState.openTripId === tripId) swipeState.openTripId = null;
+      }
+    }
+  }
+  swipeState.tripId = null;
+}
+
+function handleTripCardClick(e, tripId){
+  if(swipeState.moved){
+    swipeState.moved = false;
+    return;
+  }
+  if(swipeState.openTripId){
+    closeOpenTripCard();
+    return; // erster Tap schließt nur die freigelegte Löschen-Fläche, öffnet die Reise nicht
+  }
+  openTrip(tripId);
+}
+
+function deleteTripConfirm(tripId){
+  const trip = getTrip(tripId);
+  if(!trip) return;
+  const label = tripCountriesLabel(trip);
+  if(!confirm(`„${label}" wirklich löschen? Alle Orte, Aktivitäten und Fotos dieser Reise werden mitgelöscht.`)) return;
+  deleteTrip(tripId);
+}
+
+function deleteTrip(tripId){
+  const trip = getTrip(tripId);
+  if(!trip) return;
+  const photoIds = [];
+  (trip.places||[]).forEach(p => (p.photoIds||[]).forEach(id => photoIds.push(id)));
+  state.trips = state.trips.filter(t => t.id !== tripId);
+  swipeState.openTripId = null;
+  saveTrips();
+  render();
+  // Foto-Blobs im Hintergrund aufräumen, damit keine verwaisten Daten liegen bleiben
+  photoIds.forEach(id => { photoStorage.remove(id).catch(e => console.error(e)); });
 }
 
 // ---------- Länder-Autocomplete ----------
@@ -1899,7 +2008,8 @@ Object.assign(window, {
   removeCountryChip, onCountryInput, onCountryInputKeydown, selectCountryMatch,
   openNewWishlistForm, submitNewWishlist, openEditWishlistForm, submitEditWishlist, removeWishlistItem,
   onPhotoFilesSelected, removePhotoFromGallery, openPhotoGallery, openLightboxForPhoto, closeLightbox,
-  openPlaceMenu, openActivityMenu, openWishlistMenu
+  openPlaceMenu, openActivityMenu, openWishlistMenu,
+  onTripCardTouchStart, onTripCardTouchMove, onTripCardTouchEnd, handleTripCardClick, deleteTripConfirm
 });
 
 loadTrips();
