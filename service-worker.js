@@ -1,6 +1,6 @@
 // Bei jeder inhaltlichen Änderung an der App die Versionsnummer erhöhen,
 // damit Nutzer:innen die neue Version bekommen (alte Caches werden dann verworfen).
-const CACHE_VERSION = 'v23';
+const CACHE_VERSION = 'v24';
 const APP_CACHE = `reiseroute-app-${CACHE_VERSION}`;
 const TILE_CACHE = 'reiseroute-tiles';
 
@@ -69,6 +69,12 @@ self.addEventListener('fetch', (event) => {
   // Suchen nach demselben Begriff veraltete Treffer zeigen. Ohne Internet schlägt die Suche
   // einfach fehl, das Formular fällt dann auf die manuelle Positionierung zurück.
   if (url.hostname.endsWith('nominatim.openstreetmap.org')) {
+    event.respondWith(fetch(req));
+    return;
+  }
+
+  // Sehenswürdigkeiten-Abfrage (Wikipedia): ebenfalls immer frisch, nicht cachen.
+  if (url.hostname.endsWith('wikipedia.org')) {
     event.respondWith(fetch(req));
     return;
   }

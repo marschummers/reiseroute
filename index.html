@@ -281,6 +281,16 @@
     background:none;border:1px dashed var(--brass);color:var(--brass);border-radius:6px;
     padding:4px 8px;font-size:11.5px;font-weight:600;cursor:pointer;margin-top:6px;
   }
+  .sights-btn{
+    display:block;background:none;border:1px solid var(--teal);color:var(--teal);border-radius:6px;
+    padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer;margin-top:8px;
+  }
+  .sight-item{border-top:1px solid var(--line);padding:12px 2px;}
+  .sight-item:first-child{border-top:none;}
+  .sight-title{font-weight:600;font-size:14.5px;}
+  .sight-dist{font-size:11.5px;color:var(--text-soft);margin-top:1px;}
+  .sight-extract{font-size:13px;color:var(--text);line-height:1.5;margin-top:6px;}
+  .sight-link{font-size:12.5px;color:var(--teal);text-decoration:none;font-weight:600;display:inline-block;margin-top:6px;}
   .place-note{
     font-size:13px;color:var(--text);background:#F2EFE6;border-left:2.5px solid var(--brass);
     padding:6px 10px;margin-top:10px;border-radius:0 6px 6px 0;white-space:pre-wrap;line-height:1.45;
@@ -1344,6 +1354,7 @@ function renderPlacesViewHtml(trip, places){
           <div class="place-card-body">
             <div class="geo mono">${place.lat!=null ? place.lat.toFixed(4)+', '+place.lng.toFixed(4) : 'kein Marker gesetzt'}</div>
             ${place.lat==null ? `<button class="place-later-btn" onclick="startPlacingExistingPlace('${trip.id}','${place.id}','${escapeHtml(place.name)}')">📍 Jetzt auf Karte platzieren</button>` : ''}
+            ${place.lat!=null ? `<button class="sights-btn" onclick="showSights('${trip.id}','${place.id}')">🏛️ Sehenswürdigkeiten anzeigen</button>` : ''}
             ${place.note ? `<div class="place-note">${escapeHtml(place.note)}</div>` : ''}
             <div class="place-actions">
               <button class="menu-btn" onclick="openPlaceMenu('${trip.id}','${place.id}')">•••</button>
@@ -2032,6 +2043,60 @@ function selectPlaceSuggestion(idPrefix, index){
   if(submitBtn) submitBtn.textContent = 'Ort speichern';
 }
 
+// ---------- Sehenswürdigkeiten in der Nähe (Wikipedia-Geosuche) ----------
+// Automatisch ermittelt (Wikipedia-Artikel mit Geodaten in der Nähe der Ort-Koordinaten),
+// keine handkuratierte Reiseführer-Liste — meist gut, aber nicht garantiert perfekt sortiert.
+function formatDistance(meters){
+  if(meters == null) return '';
+  if(meters < 1000) return Math.round(meters) + ' m';
+  return (meters / 1000).toFixed(1) + ' km';
+}
+
+async function showSights(tripId, placeId){
+  const trip = getTrip(tripId);
+  const place = trip && (trip.places||[]).find(p=>p.id===placeId);
+  if(!place || place.lat == null || place.lng == null) return;
+  showSheet(`
+    <h3>Sehenswürdigkeiten — ${escapeHtml(place.name)}</h3>
+    <div id="sightsResults"><div class="place-search-status">Lädt…</div></div>
+    <div class="place-search-status" style="text-align:center;">Daten von Wikipedia</div>
+    <button class="secondary" style="width:100%;margin-top:10px;" onclick="closeSheet()">Schließen</button>
+  `);
+  try{
+    // prop=coordinates liefert die Koordinaten jedes Treffers zurück — die generator=geosearch
+    // eigene "dist"-Angabe geht bei dieser Kombination mit prop=extracts verloren, daher wird
+    // die Entfernung hier selbst berechnet (dieselbe Haversine-Funktion wie bei der
+    // "gereiste Distanz"-Statistik).
+    const url = `https://de.wikipedia.org/w/api.php?action=query&generator=geosearch&ggscoord=${place.lat}%7C${place.lng}&ggsradius=10000&ggslimit=10&prop=extracts|coordinates&exintro=true&explaintext=true&exsentences=2&format=json&origin=*`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const pages = data.query && data.query.pages ? Object.values(data.query.pages) : [];
+    pages.forEach(p=>{
+      const coord = p.coordinates && p.coordinates[0];
+      p._distMeters = coord ? haversineKm(place.lat, place.lng, coord.lat, coord.lon) * 1000 : null;
+    });
+    pages.sort((a, b) => (a._distMeters ?? Infinity) - (b._distMeters ?? Infinity));
+    const box = document.getElementById('sightsResults');
+    if(!box) return;
+    if(!pages.length){
+      box.innerHTML = `<div class="place-search-status">Keine Einträge in der Nähe gefunden.</div>`;
+      return;
+    }
+    box.innerHTML = pages.map(p => `
+      <div class="sight-item">
+        <div class="sight-title">${escapeHtml(p.title)}</div>
+        ${p._distMeters != null ? `<div class="sight-dist">${formatDistance(p._distMeters)} entfernt</div>` : ''}
+        ${p.extract ? `<div class="sight-extract">${escapeHtml(p.extract)}</div>` : ''}
+        <a class="sight-link" href="https://de.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}" target="_blank" rel="noopener">Mehr auf Wikipedia →</a>
+      </div>
+    `).join('');
+  }catch(e){
+    console.error('Sehenswürdigkeiten konnten nicht geladen werden:', e);
+    const box = document.getElementById('sightsResults');
+    if(box) box.innerHTML = `<div class="place-search-status">Laden fehlgeschlagen (ohne Internet nicht möglich).</div>`;
+  }
+}
+
 function cancelPlacing(){
   state.placing = null;
   render();
@@ -2687,7 +2752,7 @@ Object.assign(window, {
   exportBackup, onBackupFileSelected,
   onPlaceNameInput, selectPlaceSuggestion,
   openSearch, renderSearchResults, goToSearchResult,
-  switchTripView
+  switchTripView, showSights
 });
 
 loadTrips();

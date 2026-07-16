@@ -23,6 +23,13 @@ im Repo — die aktive App ist jetzt **`index.html`** (PWA-Umbau, siehe unten).
 - Marker auf Karte (Leaflet + OpenStreetMap) sind pro Ort OPTIONAL — Ort kann ohne Position
   gespeichert und später über einen Button nachträglich platziert werden
 - Marker sind eigene Inline-SVG-Pins (kein externes Icon-Bild, das war ein früherer Bug)
+- **Sehenswürdigkeiten anzeigen** (Button pro Ort, nur wenn eine Position gesetzt ist): fragt
+  Wikipedia per Geosuche nach Artikeln in der Nähe der Ort-Koordinaten (10 km Radius, bis zu 10
+  Treffer) inkl. kurzer Zusammenfassung, sortiert nach selbst berechneter Entfernung (Haversine
+  — die von der Wikipedia-API gelieferte "dist"-Angabe geht bei dieser Abfrage-Kombination
+  verloren). Automatisch ermittelt, keine handkuratierte Liste — meist gut, aber nicht
+  garantiert perfekt relevant/sortiert. Jeder Treffer verlinkt auf den vollständigen
+  Wikipedia-Artikel. Braucht Internet im Moment der Abfrage.
 - **Ortssuche beim Namen-Eintippen** (Anlegen und Bearbeiten eines Orts): Vorschlagsliste per
   Nominatim/OpenStreetMap-Geocoding (z.B. "Seefeld" → "Seefeld in Tirol" zur Auswahl), Auswahl
   übernimmt Name UND Position direkt — kein Antippen der Karte mehr nötig. Freitext ohne
