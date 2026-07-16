@@ -237,6 +237,32 @@
   }
   .add-btn:hover{border-color:var(--teal);}
 
+  .photos{margin-top:14px;border-top:1px solid var(--line);padding-top:10px;}
+  .photo-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+  .photo-thumb{
+    position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden;
+    background:#EFEAE0;border:1px solid var(--line);flex-shrink:0;
+  }
+  .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;cursor:pointer;}
+  .photo-remove{
+    position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;
+    background:rgba(15,23,35,.6);color:#fff;border:none;font-size:10px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;padding:0;line-height:1;
+  }
+  .photo-add{
+    width:72px;height:72px;border-radius:8px;border:1.5px dashed var(--line);flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;color:var(--teal);font-size:24px;
+    cursor:pointer;
+  }
+  .photo-add:hover{border-color:var(--teal);}
+  .photo-add input{display:none;}
+
+  .lightbox{
+    position:fixed;inset:0;background:rgba(10,14,20,.92);z-index:3000;
+    display:flex;align-items:center;justify-content:center;padding:24px;
+  }
+  .lightbox img{max-width:100%;max-height:100%;border-radius:8px;object-fit:contain;}
+
   .place-picker-banner{
     position:fixed;top:calc(78px + env(safe-area-inset-top));left:0;right:0;z-index:30;display:flex;justify-content:center;
   }
@@ -280,6 +306,25 @@
   }
   .country-row .name{font-weight:600;font-size:15px;}
   .country-row .dates{font-size:12.5px;color:var(--text-soft);text-align:right;}
+
+  .wishlist-card{
+    background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:14px 16px;margin-bottom:10px;
+  }
+  .wishlist-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+  .wishlist-head .name{font-size:17px;font-weight:600;}
+  .wishlist-actions{display:flex;gap:12px;flex-shrink:0;padding-top:2px;}
+  .wishlist-actions .edit{background:none;border:none;color:var(--teal);cursor:pointer;font-size:12px;padding:2px 0;}
+  .wishlist-actions .remove{background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:2px 0;}
+  .wishlist-places{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  .place-tag{
+    background:#F2EFE6;border:1px solid var(--line);color:var(--text);
+    border-radius:14px;padding:3px 10px;font-size:12.5px;
+  }
+  .wishlist-note{
+    font-size:13px;color:var(--text);background:#F2EFE6;border-left:2.5px solid var(--brass);
+    padding:6px 10px;margin-top:10px;border-radius:0 6px 6px 0;white-space:pre-wrap;line-height:1.45;
+  }
 </style>
 </head>
 <body>
@@ -299,22 +344,35 @@
 const STORAGE_KEY = 'trips';
 const ACCESS_KEY = 'access_unlocked';
 const ACCESS_PASSWORD = 'Jackyy';
+const WISHLIST_KEY = 'wishlist';
 
 // ---------- lokale Datenspeicherung (IndexedDB) ----------
 // Ersetzt die Claude.ai-spezifische window.storage-API, die außerhalb von
 // Claude-Artifacts nicht existiert. Gleiches get/set-Interface, damit der
 // Rest der App unverändert bleibt: storage.get(key) -> {value} | null,
 // storage.set(key, value) -> Promise.
+// Fotos liegen NICHT im 'kv'-Store (der wird als ein großer JSON-Blob pro Key
+// gespeichert und bei jeder Änderung komplett neu geschrieben) — dafür gibt es
+// einen eigenen 'photos'-Store, der Bild-Blobs einzeln per ID hält.
 const DB_NAME = 'reiseroute-db';
+const DB_VERSION = 2;
 const DB_STORE = 'kv';
+const PHOTO_STORE = 'photos';
 let dbPromise = null;
 
 function openDb(){
   if(dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject)=>{
-    const req = indexedDB.open(DB_NAME, 1);
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = ()=>{
-      req.result.createObjectStore(DB_STORE, { keyPath:'key' });
+      const db = req.result;
+      if(!db.objectStoreNames.contains(DB_STORE)){
+        db.createObjectStore(DB_STORE, { keyPath:'key' });
+      }
+      if(!db.objectStoreNames.contains(PHOTO_STORE)){
+        const photoStore = db.createObjectStore(PHOTO_STORE, { keyPath:'id' });
+        photoStore.createIndex('placeId', 'placeId', { unique:false });
+      }
     };
     req.onsuccess = ()=> resolve(req.result);
     req.onerror = ()=> reject(req.error);
@@ -337,6 +395,39 @@ const storage = {
     return new Promise((resolve, reject)=>{
       const tx = db.transaction(DB_STORE, 'readwrite');
       tx.objectStore(DB_STORE).put({ key, value });
+      tx.oncomplete = ()=> resolve();
+      tx.onerror = ()=> reject(tx.error);
+    });
+  }
+};
+
+// Fotos werden als Blob gespeichert (nicht als Base64-String im JSON), das ist
+// deutlich platz- und geschwindigkeitseffizienter für Bilddaten.
+const photoStorage = {
+  async add(placeId, blob){
+    const db = await openDb();
+    const id = uid() + uid();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(PHOTO_STORE, 'readwrite');
+      tx.objectStore(PHOTO_STORE).put({ id, placeId, blob, createdAt: Date.now() });
+      tx.oncomplete = ()=> resolve(id);
+      tx.onerror = ()=> reject(tx.error);
+    });
+  },
+  async getBlob(id){
+    const db = await openDb();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(PHOTO_STORE, 'readonly');
+      const req = tx.objectStore(PHOTO_STORE).get(id);
+      req.onsuccess = ()=> resolve(req.result ? req.result.blob : null);
+      req.onerror = ()=> reject(req.error);
+    });
+  },
+  async remove(id){
+    const db = await openDb();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(PHOTO_STORE, 'readwrite');
+      tx.objectStore(PHOTO_STORE).delete(id);
       tx.oncomplete = ()=> resolve();
       tx.onerror = ()=> reject(tx.error);
     });
@@ -428,8 +519,9 @@ window.addEventListener('error', (e)=>{
 });
 
 let state = {
-  view: 'loading', // loading | list | trip
+  view: 'loading', // loading | list | wishlist | countries | trip
   trips: [],
+  wishlist: [],
   currentTripId: null,
   openPlace: null,
   placing: null, // {tripId, mode:'create', placeDraft} | {tripId, mode:'update', placeId, placeName} while waiting for map click
@@ -482,6 +574,7 @@ function migrateTripIfNeeded(trip){
       if(a.date === undefined){ a.date = null; changed = true; }
       if(a.time === undefined){ a.time = null; changed = true; }
     });
+    if(p.photoIds === undefined){ p.photoIds = []; changed = true; }
   });
 
   return { trip, changed };
@@ -501,6 +594,7 @@ async function loadTrips(){
   }catch(e){
     state.trips = [];
   }
+  await loadWishlist();
   state.view = 'list';
   render();
 }
@@ -508,6 +602,27 @@ async function loadTrips(){
 async function saveTrips(){
   try{
     await storage.set(STORAGE_KEY, JSON.stringify(state.trips));
+  }catch(e){
+    state.error = 'Speichern fehlgeschlagen. Bitte erneut versuchen.';
+    render();
+  }
+}
+
+// ---------- storage: Wunschliste ----------
+// Länder/Orte, die man noch bereisen möchte — bewusst ohne Datum/Aktivitäten,
+// getrennt von den geplanten/vergangenen Reisen in state.trips.
+async function loadWishlist(){
+  try{
+    const res = await storage.get(WISHLIST_KEY);
+    state.wishlist = res && res.value ? JSON.parse(res.value) : [];
+  }catch(e){
+    state.wishlist = [];
+  }
+}
+
+async function saveWishlist(){
+  try{
+    await storage.set(WISHLIST_KEY, JSON.stringify(state.wishlist));
   }catch(e){
     state.error = 'Speichern fehlgeschlagen. Bitte erneut versuchen.';
     render();
@@ -584,6 +699,17 @@ function activityDateTimeLabel(a){
   return '';
 }
 
+function tabbarHtml(active){
+  const tabs = [
+    ['list', 'Reisen'],
+    ['wishlist', 'Wunschliste'],
+    ['countries', 'Besuchte Länder']
+  ];
+  return `<div class="tabbar">${tabs.map(([key, label]) =>
+    `<button class="${key===active?'active':''}" onclick="switchTab('${key}')">${label}</button>`
+  ).join('')}</div>`;
+}
+
 // ---------- rendering ----------
 function render(){
   const app = document.getElementById('app');
@@ -601,13 +727,21 @@ function render(){
     header.innerHTML = `
       <div class="title">🧭 Reiseroute</div>
       <div class="sub">Deine Reisen, Tag für Tag</div>
-      <div class="tabbar">
-        <button class="active" onclick="switchTab('list')">Reisen</button>
-        <button onclick="switchTab('countries')">Besuchte Länder</button>
-      </div>
+      ${tabbarHtml('list')}
     `;
     banner.innerHTML = '';
     renderList(app);
+    return;
+  }
+
+  if(state.view === 'wishlist'){
+    header.innerHTML = `
+      <div class="title">🧭 Reiseroute</div>
+      <div class="sub">Deine Reisen, Tag für Tag</div>
+      ${tabbarHtml('wishlist')}
+    `;
+    banner.innerHTML = '';
+    renderWishlist(app);
     return;
   }
 
@@ -615,10 +749,7 @@ function render(){
     header.innerHTML = `
       <div class="title">🧭 Reiseroute</div>
       <div class="sub">Deine Reisen, Tag für Tag</div>
-      <div class="tabbar">
-        <button onclick="switchTab('list')">Reisen</button>
-        <button class="active" onclick="switchTab('countries')">Besuchte Länder</button>
-      </div>
+      ${tabbarHtml('countries')}
     `;
     banner.innerHTML = '';
     renderCountries(app);
@@ -699,6 +830,115 @@ function renderCountries(app){
   }
   html += `<div style="height:30px"></div>`;
   app.innerHTML = html;
+}
+
+function renderWishlist(app){
+  let html = '';
+  if(state.wishlist.length === 0){
+    html += `
+      <div class="empty">
+        <div class="stamp">🌟</div>
+        <div class="display" style="font-size:18px;margin-bottom:6px;">Noch nichts auf der Wunschliste</div>
+        <div style="font-size:13.5px;">Trage Länder ein, die du noch bereisen möchtest — ganz ohne Datum, einfach zum Sammeln von Ideen.</div>
+      </div>`;
+  } else {
+    state.wishlist.forEach(w=>{
+      const places = w.places || [];
+      html += `
+        <div class="wishlist-card">
+          <div class="wishlist-head">
+            <div class="name display">${escapeHtml((w.countries||[]).map(countryLabel).join(', '))}</div>
+            <div class="wishlist-actions">
+              <button class="edit" onclick="openEditWishlistForm('${w.id}')">Bearbeiten</button>
+              <button class="remove" onclick="removeWishlistItem('${w.id}')">Entfernen</button>
+            </div>
+          </div>
+          ${places.length ? `<div class="wishlist-places">${places.map(p=>`<span class="place-tag">${escapeHtml(p)}</span>`).join('')}</div>` : ''}
+          ${w.note ? `<div class="wishlist-note">${escapeHtml(w.note)}</div>` : ''}
+        </div>`;
+    });
+  }
+  html += `<div style="height:70px"></div>`;
+  app.innerHTML = html;
+
+  app.insertAdjacentHTML('beforeend', `
+    <div class="fab-wrap"><div class="inner">
+      <button class="primary" onclick="openNewWishlistForm()">+ Land zur Wunschliste hinzufügen</button>
+    </div></div>`);
+}
+
+function parseCommaList(str){
+  return str.split(',').map(s=>s.trim()).filter(Boolean);
+}
+
+function openNewWishlistForm(){
+  countryPicker = { selection: [], currentMatches: [], activeIndex: -1 };
+  showSheet(`
+    <h3>Zur Wunschliste hinzufügen</h3>
+    ${countryPickerFieldHtml()}
+    <div class="field"><label>Orte (optional, durch Komma getrennt)</label><input id="w_places" placeholder="z.B. Kruger-Nationalpark, Kapstadt"></div>
+    <div class="field"><label>Notizen (optional)</label><textarea id="w_note" rows="3" placeholder="z.B. am besten im Winter wegen Nordlichter…"></textarea></div>
+    <div class="sheet-actions">
+      <button class="secondary" onclick="closeSheet()">Abbrechen</button>
+      <button class="primary" onclick="submitNewWishlist()">Hinzufügen</button>
+    </div>
+  `);
+}
+
+function submitNewWishlist(){
+  try{
+    const countries = countryPicker.selection.slice();
+    if(!countries.length){ alert('Bitte mindestens ein Land angeben.'); return; }
+    const places = parseCommaList(document.getElementById('w_places').value);
+    const note = document.getElementById('w_note').value.trim();
+    state.wishlist.push({ id: uid(), countries, places, note });
+    closeSheet();
+    saveWishlist();
+    render();
+  }catch(e){
+    console.error(e);
+    showToast('Eintrag konnte nicht gespeichert werden: ' + e.message);
+  }
+}
+
+function openEditWishlistForm(id){
+  const w = state.wishlist.find(x=>x.id===id);
+  if(!w) return;
+  countryPicker = { selection: (w.countries||[]).slice(), currentMatches: [], activeIndex: -1 };
+  showSheet(`
+    <h3>Wunschlisten-Eintrag bearbeiten</h3>
+    ${countryPickerFieldHtml()}
+    <div class="field"><label>Orte (optional, durch Komma getrennt)</label><input id="w_places" value="${escapeHtml((w.places||[]).join(', '))}" placeholder="z.B. Kruger-Nationalpark, Kapstadt"></div>
+    <div class="field"><label>Notizen (optional)</label><textarea id="w_note" rows="3">${escapeHtml(w.note||'')}</textarea></div>
+    <div class="sheet-actions">
+      <button class="secondary" onclick="closeSheet()">Abbrechen</button>
+      <button class="primary" onclick="submitEditWishlist('${id}')">Speichern</button>
+    </div>
+  `);
+}
+
+function submitEditWishlist(id){
+  try{
+    const w = state.wishlist.find(x=>x.id===id);
+    if(!w) return;
+    const countries = countryPicker.selection.slice();
+    if(!countries.length){ alert('Bitte mindestens ein Land angeben.'); return; }
+    w.countries = countries;
+    w.places = parseCommaList(document.getElementById('w_places').value);
+    w.note = document.getElementById('w_note').value.trim();
+    closeSheet();
+    saveWishlist();
+    render();
+  }catch(e){
+    console.error(e);
+    showToast('Änderung konnte nicht gespeichert werden: ' + e.message);
+  }
+}
+
+function removeWishlistItem(id){
+  state.wishlist = state.wishlist.filter(w=>w.id!==id);
+  saveWishlist();
+  render();
 }
 
 function renderList(app){
@@ -799,6 +1039,21 @@ function renderTrip(app, trip){
               `).join('')}
               <button class="add-btn" onclick="openNewActivityForm('${trip.id}','${place.id}')">+ Aktivität hinzufügen</button>
             </div>
+            <div class="photos">
+              <div class="overview-label" style="margin:0 0 4px;">Fotos</div>
+              <div class="photo-grid" id="photos-${place.id}">
+                ${(place.photoIds||[]).map(photoId => `
+                  <div class="photo-thumb" data-photo-id="${photoId}">
+                    <img alt="" onclick="openLightboxForPhoto('${photoId}')">
+                    <button class="photo-remove" onclick="event.stopPropagation();removePhoto('${trip.id}','${place.id}','${photoId}')">✕</button>
+                  </div>
+                `).join('')}
+                <label class="photo-add">
+                  <input type="file" accept="image/*" multiple onchange="onPhotoFilesSelected(event,'${trip.id}','${place.id}')">
+                  <span>+</span>
+                </label>
+              </div>
+            </div>
           </div>
         </div>
       `;
@@ -810,6 +1065,7 @@ function renderTrip(app, trip){
   app.innerHTML = html;
 
   initMap(trip);
+  renderAllPlacePhotos(trip);
 }
 
 function escapeHtml(str){
@@ -1419,6 +1675,116 @@ function removeActivity(tripId, placeId, activityId){
   render();
 }
 
+// ---------- actions: Fotos ----------
+// Fotos werden vor dem Speichern verkleinert (lange Kante max. 1600px, JPEG ~82%) —
+// Kamerafotos sind sonst oft mehrere MB groß, das würde die App unnötig aufblähen.
+// createImageBitmap mit imageOrientation:'from-image' sorgt dafür, dass hochkant
+// aufgenommene Fotos nicht gedreht landen (Canvas ignoriert EXIF sonst).
+async function resizeImageToBlob(file, maxDim, quality){
+  let bitmap;
+  try{
+    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  }catch(e){
+    bitmap = await createImageBitmap(file);
+  }
+  let { width, height } = bitmap;
+  if(width > maxDim || height > maxDim){
+    if(width >= height){ height = Math.round(height * maxDim / width); width = maxDim; }
+    else { width = Math.round(width * maxDim / height); height = maxDim; }
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  if(bitmap.close) bitmap.close();
+  return new Promise((resolve, reject)=>{
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Bild konnte nicht verarbeitet werden.')), 'image/jpeg', quality);
+  });
+}
+
+async function onPhotoFilesSelected(event, tripId, placeId){
+  const files = Array.from(event.target.files || []);
+  event.target.value = '';
+  if(!files.length) return;
+  const trip = getTrip(tripId);
+  if(!trip) return;
+  const place = (trip.places||[]).find(p=>p.id===placeId);
+  if(!place) return;
+  showToast(files.length > 1 ? 'Fotos werden hinzugefügt…' : 'Foto wird hinzugefügt…');
+  try{
+    for(const file of files){
+      const blob = await resizeImageToBlob(file, 1600, 0.82);
+      const id = await photoStorage.add(placeId, blob);
+      if(!place.photoIds) place.photoIds = [];
+      place.photoIds.push(id);
+    }
+    saveTrips();
+    render();
+  }catch(e){
+    console.error(e);
+    showToast('Foto konnte nicht gespeichert werden: ' + e.message);
+  }
+}
+
+async function removePhoto(tripId, placeId, photoId){
+  const trip = getTrip(tripId);
+  if(!trip) return;
+  const place = (trip.places||[]).find(p=>p.id===placeId);
+  if(!place) return;
+  place.photoIds = (place.photoIds||[]).filter(id=>id!==photoId);
+  try{ await photoStorage.remove(photoId); }catch(e){ console.error(e); }
+  closeLightbox();
+  saveTrips();
+  render();
+}
+
+// object URLs der aktuell angezeigten Fotos — werden bei jedem Rendern neu aufgebaut
+// und die alten dabei freigegeben, damit der Speicher nicht volläuft.
+const photoObjectUrls = {};
+
+function renderAllPlacePhotos(trip){
+  Object.values(photoObjectUrls).forEach(url => URL.revokeObjectURL(url));
+  for(const key in photoObjectUrls) delete photoObjectUrls[key];
+
+  (trip.places||[]).forEach(place=>{
+    const grid = document.getElementById('photos-' + place.id);
+    if(!grid) return;
+    (place.photoIds||[]).forEach(async (photoId)=>{
+      try{
+        const blob = await photoStorage.getBlob(photoId);
+        if(!blob) return;
+        const url = URL.createObjectURL(blob);
+        photoObjectUrls[photoId] = url;
+        const img = grid.querySelector(`[data-photo-id="${photoId}"] img`);
+        if(img) img.src = url;
+      }catch(e){
+        console.error('Foto konnte nicht geladen werden:', e);
+      }
+    });
+  });
+}
+
+function openLightboxForPhoto(photoId){
+  const url = photoObjectUrls[photoId];
+  if(url) openLightbox(url);
+}
+
+function openLightbox(url){
+  closeLightbox();
+  const ov = document.createElement('div');
+  ov.id = 'lightbox';
+  ov.className = 'lightbox';
+  ov.innerHTML = `<img src="${url}" alt="">`;
+  ov.addEventListener('click', closeLightbox);
+  document.body.appendChild(ov);
+}
+
+function closeLightbox(){
+  const ov = document.getElementById('lightbox');
+  if(ov) ov.remove();
+}
+
 // ---------- sheet (modal) ----------
 function showSheet(innerHtml){
   let overlay = document.getElementById('overlay');
@@ -1442,7 +1808,9 @@ Object.assign(window, {
   removePlace, closeSheet, openEditPlaceForm, submitEditPlace, startPlacingExistingPlace,
   openNewActivityForm, submitNewActivity, openEditActivityForm, submitEditActivity, removeActivity,
   switchTab, openEditTripForm, submitEditTrip,
-  removeCountryChip, onCountryInput, onCountryInputKeydown, selectCountryMatch
+  removeCountryChip, onCountryInput, onCountryInputKeydown, selectCountryMatch,
+  openNewWishlistForm, submitNewWishlist, openEditWishlistForm, submitEditWishlist, removeWishlistItem,
+  onPhotoFilesSelected, removePhoto, openLightboxForPhoto, closeLightbox
 });
 
 checkAccess();

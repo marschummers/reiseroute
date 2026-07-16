@@ -9,15 +9,20 @@ im Repo — die aktive App ist jetzt **`index.html`** (PWA-Umbau, siehe unten).
 - Reisen anlegen: Land/Länder über Autocomplete-Suche mit Flaggen-Emoji (Freitext als Fallback
   möglich, falls ein Land nicht in der Liste ist), Von/Bis-Datum, Notizen
 - Pro Reise: **Orte** anlegen (Name, optionale Ankunft/Abreise, optionale Notiz), jeder Ort kann
-  mehrere **Aktivitäten** enthalten (Titel + optionale mehrzeilige Bemerkung). Orte werden als
-  Liste angezeigt, sortiert nach Ankunftsdatum (Orte ohne Datum stehen am Ende). Frühere
-  Tages-Gliederung (Tag 1, Tag 2, …) wurde durch dieses Orte/Aktivitäten-Modell ersetzt.
+  mehrere **Aktivitäten** enthalten (Name + optionales Datum/Uhrzeit + optionale Bemerkung). Orte
+  werden als Liste angezeigt, sortiert nach Ankunftsdatum (Orte ohne Datum stehen am Ende).
+  Frühere Tages-Gliederung (Tag 1, Tag 2, …) wurde durch dieses Orte/Aktivitäten-Modell ersetzt.
+- Pro Ort: **Fotos** anhängen (Kamera/Fotomediathek über den nativen iOS-Dialog), werden lokal in
+  IndexedDB gespeichert (nicht im Trips-JSON) und beim Hochladen automatisch verkleinert.
 - Marker auf Karte (Leaflet + OpenStreetMap) sind pro Ort OPTIONAL — Ort kann ohne Position
   gespeichert und später über einen Button nachträglich platziert werden
 - Marker sind eigene Inline-SVG-Pins (kein externes Icon-Bild, das war ein früherer Bug)
 - Orte und Aktivitäten bearbeitbar, Reisen bearbeitbar (Länder/Daten/Notizen)
-- Zwei Tabs: "Reisen" (Liste + Detail) und "Besuchte Länder" (aggregiert aus trip.countries,
-  zeigt Datum der jeweils AKTUELLSTEN Reise pro Land, Gesamtzahl der Länder)
+- **Wunschliste**: separate Sammlung von Ländern (+ optionale Stichwort-Orte, + optionale Notiz),
+  bewusst OHNE Datum — für "das will ich irgendwann noch bereisen", getrennt von den konkret
+  geplanten/vergangenen Reisen mit Datum.
+- Drei Tabs: "Reisen" (Liste + Detail), "Wunschliste", "Besuchte Länder" (aggregiert aus
+  trip.countries, zeigt Datum der jeweils AKTUELLSTEN Reise pro Land, Gesamtzahl der Länder)
 - Übersichtskarte auf der Startseite: alle Reisen, unterschiedliche Farbe pro Reise, nur Ansicht
   (nicht editierbar, kein Klick-Handler)
 - Passwortschutz: Login-Screen vor der App, Passwort "Jackyy", nach korrekter Eingabe merkt sich
@@ -26,8 +31,10 @@ im Repo — die aktive App ist jetzt **`index.html`** (PWA-Umbau, siehe unten).
 ### Datenmodell (index.html)
 ```
 Trip { id, name, dateFrom, dateTo, notes, countries[], places: [Place] }
-Place { id, name, arrival (Datum|null), departure (Datum|null), note, lat, lng, activities: [Activity] }
+Place { id, name, arrival (Datum|null), departure (Datum|null), note, lat, lng,
+        activities: [Activity], photoIds: [string] }
 Activity { id, name, date (Datum|null), time (Uhrzeit|null), note }
+WishlistItem { id, countries[], places: [string], note }   // eigener Storage-Key 'wishlist'
 ```
 Gedachte Nutzung: Der Ort trägt das grobe Datum (z.B. für alte Reisen, wo man nur noch weiß
 "Anfang der Mexiko-Reise 2024 war ich in Tulum"). Die Aktivität kann zusätzlich ein präzises
@@ -36,10 +43,22 @@ wird beim Speichern validiert und muss innerhalb der Ankunft/Abreise des zugehö
 (falls dieser welche hat). Orte werden nach Ankunftsdatum sortiert, Aktivitäten innerhalb eines
 Orts nach Datum/Uhrzeit (undatierte jeweils ans Ende).
 
-Alte, bereits gespeicherte Reisen (egal ob im ursprünglichen Tages-Format `trip.days` oder im
-zwischenzeitlichen Orte-Format mit `activity.title` statt `activity.name`) werden beim Laden
-automatisch verlustfrei auf die aktuelle Struktur migriert (`migrateTripIfNeeded()` in
-`index.html`).
+Alte, bereits gespeicherte Reisen (egal ob im ursprünglichen Tages-Format `trip.days`, im
+zwischenzeitlichen Orte-Format mit `activity.title` statt `activity.name`, oder ohne
+`place.photoIds`) werden beim Laden automatisch verlustfrei auf die aktuelle Struktur migriert
+(`migrateTripIfNeeded()` in `index.html`).
+
+### Fotos
+Fotos liegen NICHT im `trips`-JSON (das würde bei jeder Kleinigkeit den kompletten, dann
+riesigen Blob neu schreiben), sondern in einem eigenen IndexedDB-Objectstore `photos`
+(`DB_VERSION = 2` in `index.html`, Store hält `{id, placeId, blob, createdAt}`). Ein Ort
+referenziert seine Fotos nur über `place.photoIds` (Array von IDs). Vor dem Speichern werden
+Fotos über `resizeImageToBlob()` verkleinert (längste Kante max. 1600px, JPEG ~82% Qualität) —
+Kamerafotos vom iPhone sind sonst oft 3–8 MB groß. `createImageBitmap(file, {imageOrientation:
+'from-image'})` sorgt dafür, dass hochkant aufgenommene Fotos nicht gedreht landen (Canvas
+ignoriert EXIF-Rotation sonst). Anzeige: Thumbnails laden ihre Bild-URL asynchron per
+`renderAllPlacePhotos()` nach jedem Render-Durchlauf (Object-URLs werden dabei revoked, um
+keine Speicherlecks zu erzeugen); Tippen auf ein Thumbnail öffnet eine Lightbox-Vollbildansicht.
 
 ### Länder-Autocomplete
 `data/countries.js` enthält eine lokal generierte Liste aller ~250 Länder (deutscher Name +
@@ -88,6 +107,10 @@ liefert App-Hülle ohne Netzwerk, IndexedDB-Session bleibt erhalten, keine JS-Fe
   Inline-SVG-Icons verwenden (siehe `pinIcon()` Funktion in index.html)
 - z-index-Konflikt: Leaflet-Karten-Panes können Dialoge/Overlays überlagern → Dialog-Overlay
   muss deutlich höheren z-index haben (aktuell 2000) als Kartencontainer (z-index 1)
+- Header/Zurück-Button lag auf iPhones mit Notch/Dynamic Island unter der Statusleiste und war
+  nicht klickbar → `padding-top` des Headers (und die Position des Platzierungs-Banners)
+  müssen `env(safe-area-inset-top)` einrechnen (nur sichtbar auf echtem Gerät, nicht im
+  Chrome-Test unter Windows, da dort kein Notch simuliert wird)
 
 ## Projektstruktur
 ```
@@ -100,13 +123,13 @@ icons/                 App-Icons in versch. Größen
 scripts/make-icons.ps1 Icon-Generator (PowerShell/System.Drawing)
 ```
 
-## Nächster Schritt: GitHub Pages Deploy
-Git-Repo ist lokal eingerichtet. Für den Deploy braucht es einmalig manuelle Schritte mit
-GitHub-Zugangsdaten des Nutzers (kann nicht automatisiert werden, da Kontoerstellung/Login
-nötig ist):
-1. Auf github.com ein neues, leeres Repository anlegen (z.B. "reiseroute").
-2. Von Claude Code aus lokalen Branch pushen (Remote-URL wird dann eingerichtet).
-3. In den Repo-Einstellungen unter "Pages" → "Deploy from a branch" → Branch `main`, Ordner
-   `/ (root)` auswählen.
-4. Nach ein paar Minuten ist die App unter `https://<username>.github.io/<repo-name>/`
-   erreichbar → dort auf dem iPhone in Safari öffnen → Teilen-Button → "Zum Home-Bildschirm".
+## Deploy
+Live unter **https://marschummers.github.io/reiseroute/** (GitHub Pages, Branch `main`,
+Ordner `/ (root)`). Auf dem iPhone in Safari öffnen → Teilen-Button → "Zum Home-Bildschirm", dann
+läuft die App als eigenständige, offline-fähige App vom Homescreen.
+
+Workflow für Änderungen: lokal in `index.html`/`service-worker.js`/etc. ändern, mit
+`npx http-server -p 5173 -c-1 .` lokal auf `http://localhost:5173/` testen, `CACHE_VERSION` in
+`service-worker.js` hochzählen, committen & pushen (`git push origin main`) — GitHub Pages baut
+automatisch neu (dauert ~1–2 Min). Auf dem iPhone wird die neue Version aktiv, sobald die App bei
+bestehender Internetverbindung einmal (ggf. zweimal) komplett geschlossen und neu geöffnet wird.
