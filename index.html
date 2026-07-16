@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 <script src="vendor/leaflet/leaflet.js"></script>
 <script src="data/countries.js"></script>
+<script src="data/world-map.js"></script>
 <style>
   :root{
     --ink:#1F3049;
@@ -334,6 +335,14 @@
   }
   .country-row .name{font-weight:600;font-size:15px;}
   .country-row .dates{font-size:12.5px;color:var(--text-soft);text-align:right;}
+
+  .world-map-wrap{
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:12px;margin:4px 0 18px;
+  }
+  .world-map{width:100%;height:auto;display:block;}
+  .wm-country{fill:var(--paper);stroke:var(--card);stroke-width:0.6;}
+  .wm-visited{fill:var(--brass);stroke:var(--card);stroke-width:0.6;}
 
   .wishlist-card{
     background:var(--card);border:1px solid var(--line);border-radius:10px;
@@ -830,6 +839,27 @@ function computeCountryStats(){
   return Object.values(map).sort((a,b)=> a.display.localeCompare(b.display, 'de'));
 }
 
+// Malt die Weltkarte: Pfade, deren ISO-Code zu einem besuchten Land passt, bekommen die
+// Messing-Füllfarbe. Länder, die per Freitext (nicht aus der Autocomplete-Liste) erfasst wurden,
+// haben keinen bekannten Code und bleiben auf der Karte ungefärbt — sie erscheinen aber weiterhin
+// ganz normal in der Liste darunter.
+function worldMapHtml(countries){
+  if(typeof WORLD_MAP === 'undefined') return '';
+  const visitedCodes = new Set();
+  countries.forEach(c=>{
+    const entry = COUNTRY_BY_LOWER_NAME[c.display.toLowerCase()];
+    if(entry) visitedCodes.add(entry.code);
+  });
+  const paths = Object.keys(WORLD_MAP.paths).map(code=>{
+    const visited = visitedCodes.has(code);
+    return `<path d="${WORLD_MAP.paths[code]}" class="${visited ? 'wm-visited' : 'wm-country'}"></path>`;
+  }).join('');
+  return `
+    <div class="world-map-wrap">
+      <svg viewBox="0 0 ${WORLD_MAP.width} ${WORLD_MAP.height}" class="world-map">${paths}</svg>
+    </div>`;
+}
+
 function renderCountries(app){
   const countries = computeCountryStats();
   let html = `
@@ -846,6 +876,7 @@ function renderCountries(app){
         <div style="font-size:13.5px;">Trage bei einer Reise unter „Land/Länder" ein, wo du warst — hier siehst du dann die Übersicht.</div>
       </div>`;
   } else {
+    html += worldMapHtml(countries);
     countries.forEach(c=>{
       html += `
         <div class="country-row">

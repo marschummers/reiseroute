@@ -56,9 +56,15 @@ referenziert seine Fotos nur über `place.photoIds` (Array von IDs). Vor dem Spe
 Fotos über `resizeImageToBlob()` verkleinert (längste Kante max. 1600px, JPEG ~82% Qualität) —
 Kamerafotos vom iPhone sind sonst oft 3–8 MB groß. `createImageBitmap(file, {imageOrientation:
 'from-image'})` sorgt dafür, dass hochkant aufgenommene Fotos nicht gedreht landen (Canvas
-ignoriert EXIF-Rotation sonst). Anzeige: Thumbnails laden ihre Bild-URL asynchron per
-`renderAllPlacePhotos()` nach jedem Render-Durchlauf (Object-URLs werden dabei revoked, um
-keine Speicherlecks zu erzeugen); Tippen auf ein Thumbnail öffnet eine Lightbox-Vollbildansicht.
+ignoriert EXIF-Rotation sonst).
+
+Anzeige: In der Ort-Karte steht nur eine kompakte Vorschau (max. 3 Thumbnails + "+",
+`photoPreviewHtml()`), die auf die vollständige Galerie verweist (`openPhotoGallery()`, als
+Sheet). Erst dort werden alle Fotos geladen (`renderGalleryPhotos()`), Fotos einzeln entfernt
+(`removePhotoFromGallery()`) oder groß angesehen (Lightbox). Bild-Blob-URLs werden in
+`photoObjectUrls` gecacht (`getPhotoUrl()`) und bewusst nicht laufend wieder freigegeben — bei
+den paar Dutzend Fotos, die realistisch in einer Sitzung angesehen werden, ist das
+vernachlässigbar, und der Browser räumt beim Neuladen ohnehin auf.
 
 ### Länder-Autocomplete
 `data/countries.js` enthält eine lokal generierte Liste aller ~250 Länder (deutscher Name +
@@ -70,6 +76,15 @@ nicht in der Liste) funktionieren weiterhin als Fallback, bekommen dann aber kei
 Hinweis: Flaggen-Emoji werden auf iPhone/Safari korrekt als Bild dargestellt; auf Windows kann es
 je nach Schriftart/Browser sein, dass nur die zwei Buchstaben des Ländercodes angezeigt werden —
 das ist eine Windows-Einschränkung, kein Bug.
+
+### Weltkarte ("Besuchte Länder")
+`data/world-map.js` enthält Länderumrisse als SVG-Pfade (Schlüssel = ISO-Code), extrahiert aus
+`neveldo/jQuery-Mapael` (MIT-Lizenz, ursprünglich abgeleitet von Wikimedia Commons
+"BlankMap-World6-Equirectangular.svg"), 176 Länder, keine Laufzeit-Abhängigkeit. `worldMapHtml()`
+in `index.html` baut daraus ein statisches (nicht zoombares) Inline-SVG und färbt die Pfade, deren
+Code zu einem besuchten Land passt, in Messing ein. Länder, die nur per Freitext erfasst wurden
+(nicht in `data/countries.js`), bleiben auf der Karte ungefärbt, tauchen aber ganz normal in der
+Liste darunter auf.
 
 ## PWA-Umbau — Status: fertig, lokal getestet
 Ziel-Architektur (mit Nutzer abgestimmt): Alle Daten NUR lokal auf dem iPhone (kein Server,
