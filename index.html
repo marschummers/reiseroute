@@ -323,11 +323,26 @@
   .loading, .error-box{text-align:center;padding:40px;color:var(--text-soft);}
   .pin-icon{background:none;border:none;}
 
-  .country-stat{
-    text-align:center;padding:22px 10px 26px;
+  .stats-grid{display:flex;gap:10px;margin:4px 0 18px;}
+  .stat-tile{
+    flex:1;text-align:center;background:var(--card);border:1px solid var(--line);
+    border-radius:10px;padding:16px 6px;
   }
-  .country-stat .num{font-size:44px;font-weight:700;color:var(--ink);line-height:1;}
-  .country-stat .label{font-size:13px;color:var(--text-soft);margin-top:4px;}
+  .stat-tile .num{font-size:30px;font-weight:700;color:var(--ink);line-height:1;}
+  .stat-tile .label{font-size:11.5px;color:var(--text-soft);margin-top:4px;}
+
+  .year-stats{
+    background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:4px 16px;margin-bottom:18px;
+  }
+  .year-row{
+    display:flex;justify-content:space-between;padding:10px 0;
+    border-top:1px solid var(--line);font-size:14px;
+  }
+  .year-row:first-child{border-top:none;}
+  .year-row span:first-child{font-weight:600;}
+  .year-row span:last-child{color:var(--text-soft);}
+
   .country-row{
     display:flex;align-items:center;justify-content:space-between;gap:10px;
     background:var(--card);border:1px solid var(--line);border-radius:10px;
@@ -335,6 +350,13 @@
   }
   .country-row .name{font-weight:600;font-size:15px;}
   .country-row .dates{font-size:12.5px;color:var(--text-soft);text-align:right;}
+
+  .backup-section{
+    background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:16px;
+  }
+  .backup-desc{font-size:13px;color:var(--text-soft);line-height:1.5;margin:4px 0 14px;}
+  .backup-actions{display:flex;flex-direction:column;gap:8px;}
 
   .world-map-wrap{
     background:var(--card);border:1px solid var(--line);border-radius:12px;
@@ -685,7 +707,7 @@ function tabbarHtml(active){
   const tabs = [
     ['list', 'Reisen'],
     ['wishlist', 'Wunschliste'],
-    ['countries', 'Besuchte Länder']
+    ['stats', 'Statistiken']
   ];
   return `<div class="tabbar">${tabs.map(([key, label]) =>
     `<button class="${key===active?'active':''}" onclick="switchTab('${key}')">${label}</button>`
@@ -727,14 +749,14 @@ function render(){
     return;
   }
 
-  if(state.view === 'countries'){
+  if(state.view === 'stats'){
     header.innerHTML = `
       <div class="title">🧭 Reiseroute</div>
       <div class="sub">Deine Reisen, Tag für Tag</div>
-      ${tabbarHtml('countries')}
+      ${tabbarHtml('stats')}
     `;
     banner.innerHTML = '';
-    renderCountries(app);
+    renderStats(app);
     return;
   }
 
@@ -807,31 +829,79 @@ function worldMapHtml(countries){
     </div>`;
 }
 
-function renderCountries(app){
+function computeTripStats(){
+  const totalTrips = state.trips.length;
+  const totalDays = state.trips.reduce((sum, t) => sum + dateRange(t.dateFrom, t.dateTo).length, 0);
+  const byYear = {};
+  state.trips.forEach(t=>{
+    const year = t.dateFrom.slice(0, 4);
+    byYear[year] = (byYear[year] || 0) + 1;
+  });
+  const years = Object.keys(byYear).sort((a, b) => b.localeCompare(a));
+  return { totalTrips, totalDays, byYear, years };
+}
+
+function statsGridHtml(tripStats, countries){
+  return `
+    <div class="stats-grid">
+      <div class="stat-tile">
+        <div class="num">${tripStats.totalTrips}</div>
+        <div class="label">${tripStats.totalTrips===1?'Reise':'Reisen'}</div>
+      </div>
+      <div class="stat-tile">
+        <div class="num">${countries.length}</div>
+        <div class="label">${countries.length===1?'Land':'Länder'}</div>
+      </div>
+      <div class="stat-tile">
+        <div class="num">${tripStats.totalDays}</div>
+        <div class="label">${tripStats.totalDays===1?'Tag':'Tage'} gereist</div>
+      </div>
+    </div>`;
+}
+
+function yearBreakdownHtml(tripStats){
+  if(tripStats.years.length < 2) return '';
+  return `
+    <div class="overview-label">Reisen pro Jahr</div>
+    <div class="year-stats">
+      ${tripStats.years.map(y => `
+        <div class="year-row">
+          <span>${y}</span>
+          <span>${tripStats.byYear[y]} ${tripStats.byYear[y]===1?'Reise':'Reisen'}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+function renderStats(app){
   const countries = computeCountryStats();
-  let html = `
-    <div class="country-stat">
-      <div class="num">${countries.length}</div>
-      <div class="label">${countries.length===1?'Land besucht':'Länder besucht'}</div>
-    </div>
-  `;
-  if(countries.length === 0){
+  const tripStats = computeTripStats();
+  let html = '';
+
+  if(state.trips.length === 0){
     html += `
       <div class="empty">
         <div class="stamp">🌍</div>
-        <div class="display" style="font-size:18px;margin-bottom:6px;">Noch keine Länder erfasst</div>
-        <div style="font-size:13.5px;">Trage bei einer Reise unter „Land/Länder" ein, wo du warst — hier siehst du dann die Übersicht.</div>
+        <div class="display" style="font-size:18px;margin-bottom:6px;">Noch keine Statistiken</div>
+        <div style="font-size:13.5px;">Leg eine Reise an — hier siehst du dann Länder, gereiste Tage und mehr.</div>
       </div>`;
   } else {
+    html += statsGridHtml(tripStats, countries);
     html += worldMapHtml(countries);
-    countries.forEach(c=>{
-      html += `
-        <div class="country-row">
-          <div class="name">${escapeHtml(countryLabel(c.display))}</div>
-          <div class="dates">${fmtDateShort(c.dateFrom)} –<br>${fmtDateShort(c.dateTo)}</div>
-        </div>`;
-    });
+    html += yearBreakdownHtml(tripStats);
+    if(countries.length){
+      html += `<div class="overview-label">Besuchte Länder</div>`;
+      countries.forEach(c=>{
+        html += `
+          <div class="country-row">
+            <div class="name">${escapeHtml(countryLabel(c.display))}</div>
+            <div class="dates">${fmtDateShort(c.dateFrom)} –<br>${fmtDateShort(c.dateTo)}</div>
+          </div>`;
+      });
+    }
   }
+
+  html += `<div style="height:14px"></div>`;
+  html += backupSectionHtml();
   html += `<div style="height:30px"></div>`;
   app.innerHTML = html;
 }
@@ -2002,6 +2072,143 @@ function closeLightbox(){
   if(ov) ov.remove();
 }
 
+// ---------- Datensicherung (Export/Import) ----------
+// Alle Daten liegen nur auf diesem Gerät. Export bündelt Reisen, Wunschliste und alle Fotos
+// (als Base64 eingebettet — für eine einmalige Sicherung unproblematisch, im Gegensatz zum
+// laufenden Speichern, wo das die trips-JSON aufblähen würde) in eine einzelne JSON-Datei.
+const BACKUP_VERSION = 1;
+
+function backupSectionHtml(){
+  return `
+    <div class="backup-section">
+      <div class="overview-label">Datensicherung</div>
+      <div class="backup-desc">Reisen, Wunschliste und Fotos liegen nur auf diesem Gerät. Sichere sie regelmäßig,
+        damit bei einem Gerätewechsel oder -verlust nichts verloren geht.</div>
+      <div class="backup-actions">
+        <button class="secondary" onclick="exportBackup()">Sicherung exportieren</button>
+        <button class="secondary" onclick="document.getElementById('backupFileInput').click()">Sicherung importieren</button>
+      </div>
+      <input type="file" id="backupFileInput" accept="application/json" style="display:none" onchange="onBackupFileSelected(event)">
+    </div>`;
+}
+
+function blobToDataUrl(blob){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result);
+    reader.onerror = ()=> reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function buildBackupPayload(){
+  const photos = {};
+  for(const trip of state.trips){
+    for(const place of (trip.places||[])){
+      for(const photoId of (place.photoIds||[])){
+        try{
+          const blob = await photoStorage.getBlob(photoId);
+          if(blob) photos[photoId] = await blobToDataUrl(blob);
+        }catch(e){
+          console.error('Foto konnte nicht in die Sicherung aufgenommen werden:', e);
+        }
+      }
+    }
+  }
+  return {
+    app: 'reiseroute-backup',
+    version: BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    trips: state.trips,
+    wishlist: state.wishlist,
+    photos
+  };
+}
+
+async function exportBackup(){
+  try{
+    showToast('Sicherung wird erstellt…');
+    const payload = await buildBackupPayload();
+    const filename = `reiseroute-backup-${new Date().toISOString().slice(0,10)}.json`;
+    const file = new File([JSON.stringify(payload)], filename, { type: 'application/json' });
+
+    let shared = false;
+    if(navigator.canShare && navigator.canShare({ files: [file] })){
+      try{
+        await navigator.share({ files: [file], title: 'Reiseroute-Sicherung' });
+        shared = true;
+      }catch(shareErr){
+        if(shareErr && shareErr.name === 'AbortError') return; // Nutzer hat Teilen-Dialog abgebrochen
+        // sonst unten auf Download-Fallback zurückfallen
+      }
+    }
+    if(!shared){
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast('Sicherung heruntergeladen.');
+    }
+  }catch(e){
+    console.error(e);
+    showToast('Sicherung konnte nicht erstellt werden: ' + e.message);
+  }
+}
+
+async function onBackupFileSelected(event){
+  const file = event.target.files && event.target.files[0];
+  event.target.value = '';
+  if(!file) return;
+  if(!confirm('Vorhandene Reisen, Wunschliste und Fotos werden durch die Sicherung ersetzt. Fortfahren?')) return;
+  try{
+    showToast('Sicherung wird eingespielt…');
+    const text = await file.text();
+    const payload = JSON.parse(text);
+    if(!payload || !Array.isArray(payload.trips)){
+      showToast('Diese Datei ist keine gültige Reiseroute-Sicherung.');
+      return;
+    }
+
+    const placeIdByPhotoId = {};
+    payload.trips.forEach(t => (t.places||[]).forEach(p => (p.photoIds||[]).forEach(id => {
+      placeIdByPhotoId[id] = p.id;
+    })));
+
+    const db = await openDb();
+    await new Promise((resolve, reject)=>{
+      const tx = db.transaction(PHOTO_STORE, 'readwrite');
+      tx.objectStore(PHOTO_STORE).clear();
+      tx.oncomplete = resolve;
+      tx.onerror = ()=> reject(tx.error);
+    });
+    const photos = payload.photos || {};
+    for(const [photoId, dataUrl] of Object.entries(photos)){
+      const blob = await (await fetch(dataUrl)).blob();
+      await new Promise((resolve, reject)=>{
+        const tx = db.transaction(PHOTO_STORE, 'readwrite');
+        tx.objectStore(PHOTO_STORE).put({ id: photoId, placeId: placeIdByPhotoId[photoId] || null, blob, createdAt: Date.now() });
+        tx.oncomplete = resolve;
+        tx.onerror = ()=> reject(tx.error);
+      });
+    }
+
+    state.trips = payload.trips.map(t => migrateTripIfNeeded(t).trip);
+    state.wishlist = payload.wishlist || [];
+    await saveTrips();
+    await saveWishlist();
+    state.view = 'list';
+    render();
+    showToast('Sicherung erfolgreich eingespielt.');
+  }catch(e){
+    console.error(e);
+    showToast('Sicherung konnte nicht eingespielt werden: ' + e.message);
+  }
+}
+
 // ---------- sheet (modal) ----------
 function showSheet(innerHtml){
   let overlay = document.getElementById('overlay');
@@ -2030,7 +2237,8 @@ Object.assign(window, {
   onPhotoFilesSelected, removePhotoFromGallery, openPhotoGallery, openLightboxForPhoto, closeLightbox,
   openPlaceMenu, openActivityMenu, openWishlistMenu,
   onTripCardTouchStart, onTripCardTouchMove, onTripCardTouchEnd, handleTripCardClick, deleteTripConfirm,
-  syncDateRangeField, onDateRangeToInput
+  syncDateRangeField, onDateRangeToInput,
+  exportBackup, onBackupFileSelected
 });
 
 loadTrips();

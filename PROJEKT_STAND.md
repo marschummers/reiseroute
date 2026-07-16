@@ -24,9 +24,15 @@ im Repo — die aktive App ist jetzt **`index.html`** (PWA-Umbau, siehe unten).
 - **Wunschliste**: separate Sammlung von Ländern (+ optionale Stichwort-Orte, + optionale Notiz),
   bewusst OHNE Datum — für "das will ich irgendwann noch bereisen", getrennt von den konkret
   geplanten/vergangenen Reisen mit Datum.
-- Drei Tabs: "Reisen" (Liste + Detail), "Wunschliste", "Besuchte Länder" (aggregiert aus
-  trip.countries, zeigt Datum der jeweils AKTUELLSTEN Reise pro Land, Gesamtzahl der Länder,
-  plus Weltkarte mit in Messing eingefärbten besuchten Ländern)
+- Drei Tabs: "Reisen" (Liste + Detail), "Wunschliste", "Statistiken" (früher "Besuchte Länder" —
+  Kacheln für Reisen/Länder/gereiste Tage gesamt, Weltkarte mit in Messing eingefärbten besuchten
+  Ländern, Reisen-pro-Jahr-Übersicht, Länderliste mit Datum der jeweils AKTUELLSTEN Reise pro
+  Land, plus der Datensicherungs-Bereich siehe unten)
+- **Datensicherung**: Export/Import als JSON-Datei (inkl. aller Fotos), auf der Statistiken-Seite.
+  Export nutzt die iOS-Teilen-Funktion (Sichern in Dateien-App, AirDrop, Mail, iCloud Drive …),
+  mit Direkt-Download als Fallback, falls Web-Share nicht verfügbar ist (z.B. Desktop-Browser).
+  Import ersetzt nach Bestätigung alle aktuellen Daten — das ist auch der Weg für einen
+  Geräte-Wechsel: auf dem alten Gerät exportieren, auf dem neuen importieren.
 - Übersichtskarte auf der Startseite: alle Reisen, unterschiedliche Farbe pro Reise, nur Ansicht
   (nicht editierbar, kein Klick-Handler)
 - Kein Passwortschutz (mehr) — die App wurde ursprünglich mit einem simplen Passwort-Gate
