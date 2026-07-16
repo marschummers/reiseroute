@@ -877,11 +877,23 @@ function parseCommaList(str){
 // Übernimmt das "Von"-Datum ins "Bis"-Feld, solange "Bis" noch leer ist oder vor "Von" liegt.
 // Verhindert, dass man beim Öffnen des "Bis"-Datepickers erst von "heute" aus Jahre zurück-
 // oder vorscrollen muss, wenn "Von" schon weit in der Vergangenheit/Zukunft liegt.
+// Solange "Bis" noch nicht eigenhändig angetastet wurde (data-autofollow bleibt undefined/"true"),
+// folgt es "Von" in beide Richtungen exakt. Sobald man "Bis" selbst ändert, wird es "angepinnt"
+// und ändert sich bei weiteren "Von"-Änderungen nur noch, falls es sonst ungültig würde
+// (Bis vor Von) — die eigene Wahl bleibt also erhalten, statt überschrieben zu werden.
 function syncDateRangeField(fromId, toId){
   const from = document.getElementById(fromId).value;
   const toField = document.getElementById(toId);
   if(!from || !toField) return;
-  if(!toField.value || toField.value < from) toField.value = from;
+  const autoFollow = toField.dataset.autofollow !== 'false';
+  if(!toField.value || autoFollow || toField.value < from){
+    toField.value = from;
+  }
+}
+
+function onDateRangeToInput(toId){
+  const toField = document.getElementById(toId);
+  if(toField) toField.dataset.autofollow = 'false';
 }
 
 function openNewWishlistForm(){
@@ -1481,7 +1493,7 @@ function openNewTripForm(){
     <h3>Neue Reise</h3>
     ${countryPickerFieldHtml()}
     <div class="field"><label>Von</label><input id="f_from" type="date" oninput="syncDateRangeField('f_from','f_to')"></div>
-    <div class="field"><label>Bis</label><input id="f_to" type="date"></div>
+    <div class="field"><label>Bis</label><input id="f_to" type="date" oninput="onDateRangeToInput('f_to')"></div>
     <div class="field"><label>Notizen (optional)</label><textarea id="f_notes" rows="2" placeholder="Planungsnotizen…"></textarea></div>
     <div class="sheet-actions">
       <button class="secondary" onclick="closeSheet()">Abbrechen</button>
@@ -1519,7 +1531,7 @@ function openEditTripForm(tripId){
     <h3>Reise bearbeiten</h3>
     ${countryPickerFieldHtml()}
     <div class="field"><label>Von</label><input id="t_from" type="date" value="${trip.dateFrom}" oninput="syncDateRangeField('t_from','t_to')"></div>
-    <div class="field"><label>Bis</label><input id="t_to" type="date" value="${trip.dateTo}"></div>
+    <div class="field"><label>Bis</label><input id="t_to" type="date" value="${trip.dateTo}" data-autofollow="false" oninput="onDateRangeToInput('t_to')"></div>
     <div class="field"><label>Notizen (optional)</label><textarea id="t_notes" rows="2">${escapeHtml(trip.notes||'')}</textarea></div>
     <div class="sheet-actions">
       <button class="secondary" onclick="closeSheet()">Abbrechen</button>
@@ -1570,7 +1582,7 @@ function openNewPlaceForm(){
     <h3>Neuer Ort</h3>
     <div class="field"><label>Name</label><input id="p_name" placeholder="z.B. Kapstadt"></div>
     <div class="field"><label>Ankunft (optional)</label><input id="p_arrival" type="date" oninput="syncDateRangeField('p_arrival','p_departure')"></div>
-    <div class="field"><label>Abreise (optional)</label><input id="p_departure" type="date"></div>
+    <div class="field"><label>Abreise (optional)</label><input id="p_departure" type="date" oninput="onDateRangeToInput('p_departure')"></div>
     <div class="field"><label>Notizen (optional)</label><textarea id="p_note" rows="3" placeholder="z.B. Unterkunft, Anreise-Infos…"></textarea></div>
     <div class="sheet-actions">
       <button class="secondary" onclick="submitNewPlaceNoPosition()">Ohne Position speichern</button>
@@ -1677,7 +1689,7 @@ function openEditPlaceForm(tripId, placeId){
     <h3>Ort bearbeiten</h3>
     <div class="field"><label>Name</label><input id="ep_name" value="${escapeHtml(p.name)}"></div>
     <div class="field"><label>Ankunft (optional)</label><input id="ep_arrival" type="date" value="${p.arrival||''}" oninput="syncDateRangeField('ep_arrival','ep_departure')"></div>
-    <div class="field"><label>Abreise (optional)</label><input id="ep_departure" type="date" value="${p.departure||''}"></div>
+    <div class="field"><label>Abreise (optional)</label><input id="ep_departure" type="date" value="${p.departure||''}" ${p.departure?'data-autofollow="false"':''} oninput="onDateRangeToInput('ep_departure')"></div>
     <div class="field"><label>Notizen (optional)</label><textarea id="ep_note" rows="3">${escapeHtml(p.note||'')}</textarea></div>
     <div class="sheet-actions">
       <button class="secondary" onclick="closeSheet()">Abbrechen</button>
@@ -2018,7 +2030,7 @@ Object.assign(window, {
   onPhotoFilesSelected, removePhotoFromGallery, openPhotoGallery, openLightboxForPhoto, closeLightbox,
   openPlaceMenu, openActivityMenu, openWishlistMenu,
   onTripCardTouchStart, onTripCardTouchMove, onTripCardTouchEnd, handleTripCardClick, deleteTripConfirm,
-  syncDateRangeField
+  syncDateRangeField, onDateRangeToInput
 });
 
 loadTrips();
