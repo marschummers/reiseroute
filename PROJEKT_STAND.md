@@ -38,6 +38,10 @@ im Repo — die aktive App ist jetzt **`index.html`** (PWA-Umbau, siehe unten).
   mit Direkt-Download als Fallback, falls Web-Share nicht verfügbar ist (z.B. Desktop-Browser).
   Import ersetzt nach Bestätigung alle aktuellen Daten — das ist auch der Weg für einen
   Geräte-Wechsel: auf dem alten Gerät exportieren, auf dem neuen importieren.
+- **Suche** (🔍-Button im Header auf Reisen/Wunschliste/Statistiken): Volltextsuche über
+  Reise-Länder, Orte und Aktivitäten (inkl. deren Notiz-Texte), gruppierte Ergebnisliste, Tippen
+  auf ein Ergebnis öffnet die passende Reise (bei Orten/Aktivitäten direkt mit aufgeklapptem Ort).
+  Rein lokal, kein Netzwerk nötig.
 - Übersichtskarte auf der Startseite: alle Reisen, unterschiedliche Farbe pro Reise, nur Ansicht
   (nicht editierbar, kein Klick-Handler)
 - **Titelfoto** je Reise in der Reisenliste (automatisch das erste Foto des ersten Orts mit
