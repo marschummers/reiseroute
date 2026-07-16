@@ -17,6 +17,11 @@ im Repo — die aktive App ist jetzt **`index.html`** (PWA-Umbau, siehe unten).
 - Marker auf Karte (Leaflet + OpenStreetMap) sind pro Ort OPTIONAL — Ort kann ohne Position
   gespeichert und später über einen Button nachträglich platziert werden
 - Marker sind eigene Inline-SVG-Pins (kein externes Icon-Bild, das war ein früherer Bug)
+- **Ortssuche beim Namen-Eintippen** (Anlegen und Bearbeiten eines Orts): Vorschlagsliste per
+  Nominatim/OpenStreetMap-Geocoding (z.B. "Seefeld" → "Seefeld in Tirol" zur Auswahl), Auswahl
+  übernimmt Name UND Position direkt — kein Antippen der Karte mehr nötig. Freitext ohne
+  Vorschlags-Auswahl funktioniert weiterhin (Fallback: Position später manuell auf der Karte
+  setzen). Braucht Internet im Moment der Suche (wie die Kartenkacheln selbst).
 - Orte und Aktivitäten bearbeitbar, Reisen bearbeitbar (Länder/Daten/Notizen)
 - Reisen löschbar per Swipe-nach-links auf der Reisen-Karte (iOS-Standardmuster wie bei
   Mail/Erinnerungen), mit Bestätigungsabfrage — löscht auch alle Orte, Aktivitäten und Fotos

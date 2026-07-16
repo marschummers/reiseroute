@@ -206,6 +206,11 @@
   .country-suggestion .flag{font-size:17px;}
   .country-hint{font-size:12px;color:var(--text-soft);margin-top:5px;}
 
+  /* ---- Ortssuche (Geocoding) ---- */
+  .place-search{position:relative;}
+  .place-search-status{padding:10px 12px;font-size:13px;color:var(--text-soft);}
+  .place-geo-confirm{font-size:12px;color:var(--teal);margin-top:5px;min-height:15px;}
+
   /* ---- Trip detail ---- */
   .trip-header{margin-bottom:14px;}
   .trip-header .name{font-size:24px;font-weight:600;}
@@ -1787,15 +1792,23 @@ function openNewPlaceForm(){
   const trip = getTrip(state.currentTripId);
   const defaultArrival = trip ? trip.dateFrom : '';
   const defaultDeparture = trip ? trip.dateTo : '';
+  placeGeocode = null;
   showSheet(`
     <h3>Neuer Ort</h3>
-    <div class="field"><label>Name</label><input id="p_name" placeholder="z.B. Kapstadt"></div>
+    <div class="field">
+      <label>Name</label>
+      <div class="place-search">
+        <input id="p_name" placeholder="z.B. Seefeld" autocomplete="off" oninput="onPlaceNameInput('p_', this.value)">
+        <div class="country-suggestions" id="p_suggestions"></div>
+      </div>
+      <div class="place-geo-confirm" id="p_geoConfirm"></div>
+    </div>
     <div class="field"><label>Ankunft (optional)</label><input id="p_arrival" type="date" value="${defaultArrival}" oninput="syncDateRangeField('p_arrival','p_departure')"></div>
     <div class="field"><label>Abreise (optional)</label><input id="p_departure" type="date" value="${defaultDeparture}" data-autofollow="false" oninput="onDateRangeToInput('p_departure')"></div>
     <div class="field"><label>Notizen (optional)</label><textarea id="p_note" rows="3" placeholder="z.B. Unterkunft, Anreise-Infos…"></textarea></div>
     <div class="sheet-actions">
       <button class="secondary" onclick="submitNewPlaceNoPosition()">Ohne Position speichern</button>
-      <button class="primary" onclick="submitNewPlace()">Auf Karte platzieren</button>
+      <button class="primary" id="p_submitBtn" onclick="submitNewPlace()">Auf Karte platzieren</button>
     </div>
   `);
 }
@@ -1822,9 +1835,87 @@ function submitNewPlace(){
   const draft = readPlaceFields('p_');
   if(!draft) return;
   closeSheet();
-  state.placing = { tripId: state.currentTripId, mode:'create', placeDraft: draft };
-  render();
-  window.scrollTo({top:0, behavior:'smooth'});
+  if(placeGeocode){
+    addPlace(state.currentTripId, draft, placeGeocode.lat, placeGeocode.lng);
+    render();
+  } else {
+    state.placing = { tripId: state.currentTripId, mode:'create', placeDraft: draft };
+    render();
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+}
+
+// ---------- Ortssuche (Geocoding über Nominatim/OpenStreetMap) ----------
+// Nutzt dieselbe Kartendatenquelle, die die App schon für die Kartenkacheln verwendet.
+// Ergebnis wird beim Absenden des Formulars verwendet, falls der/die Nutzer:in eine
+// Vorschlags-Auswahl getroffen hat — sonst bleibt der bisherige "Auf Karte tippen"-Weg bestehen.
+let placeGeocode = null;
+let placeSearchResults = [];
+let placeSearchDebounce = null;
+let placeSearchAbortController = null;
+
+function formatPlaceSuggestion(result){
+  const parts = (result.display_name || '').split(',').map(s => s.trim()).filter(Boolean);
+  return parts.slice(0, 3).join(', ');
+}
+
+function clearPlaceSuggestions(idPrefix){
+  const box = document.getElementById(idPrefix + 'suggestions');
+  if(box) box.innerHTML = '';
+}
+
+function onPlaceNameInput(idPrefix, value){
+  placeGeocode = null;
+  const confirmEl = document.getElementById(idPrefix + 'geoConfirm');
+  if(confirmEl) confirmEl.textContent = '';
+  const submitBtn = document.getElementById(idPrefix + 'submitBtn');
+  if(submitBtn) submitBtn.textContent = 'Auf Karte platzieren';
+  clearPlaceSuggestions(idPrefix);
+  clearTimeout(placeSearchDebounce);
+  const query = value.trim();
+  if(query.length < 3) return;
+  placeSearchDebounce = setTimeout(() => searchPlaces(idPrefix, query), 500);
+}
+
+async function searchPlaces(idPrefix, query){
+  if(placeSearchAbortController) placeSearchAbortController.abort();
+  placeSearchAbortController = new AbortController();
+  const box = document.getElementById(idPrefix + 'suggestions');
+  if(box) box.innerHTML = `<div class="place-search-status">Suche…</div>`;
+  try{
+    const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&q=${encodeURIComponent(query)}`;
+    const res = await fetch(url, { signal: placeSearchAbortController.signal, headers: { 'Accept-Language': 'de' } });
+    const results = await res.json();
+    placeSearchResults = results;
+    if(!box) return;
+    if(!results.length){
+      box.innerHTML = `<div class="place-search-status">Keine Treffer</div>`;
+      return;
+    }
+    box.innerHTML = results.map((r, i) => `
+      <div class="country-suggestion" onclick="selectPlaceSuggestion('${idPrefix}', ${i})">
+        <span>${escapeHtml(formatPlaceSuggestion(r))}</span>
+      </div>
+    `).join('');
+  }catch(e){
+    if(e.name === 'AbortError') return;
+    console.error('Ortssuche fehlgeschlagen:', e);
+    if(box) box.innerHTML = `<div class="place-search-status">Suche fehlgeschlagen (ohne Internet nicht möglich)</div>`;
+  }
+}
+
+function selectPlaceSuggestion(idPrefix, index){
+  const r = placeSearchResults[index];
+  if(!r) return;
+  placeGeocode = { lat: parseFloat(r.lat), lng: parseFloat(r.lon) };
+  const label = formatPlaceSuggestion(r);
+  const nameField = document.getElementById(idPrefix + 'name');
+  if(nameField) nameField.value = label.split(',')[0];
+  clearPlaceSuggestions(idPrefix);
+  const confirmEl = document.getElementById(idPrefix + 'geoConfirm');
+  if(confirmEl) confirmEl.textContent = '📍 Position von ' + label + ' übernommen';
+  const submitBtn = document.getElementById(idPrefix + 'submitBtn');
+  if(submitBtn) submitBtn.textContent = 'Ort speichern';
 }
 
 function cancelPlacing(){
@@ -1894,9 +1985,17 @@ function openEditPlaceForm(tripId, placeId){
   if(!trip) return;
   const p = (trip.places||[]).find(x=>x.id===placeId);
   if(!p) return;
+  placeGeocode = null;
   showSheet(`
     <h3>Ort bearbeiten</h3>
-    <div class="field"><label>Name</label><input id="ep_name" value="${escapeHtml(p.name)}"></div>
+    <div class="field">
+      <label>Name</label>
+      <div class="place-search">
+        <input id="ep_name" value="${escapeHtml(p.name)}" autocomplete="off" oninput="onPlaceNameInput('ep_', this.value)">
+        <div class="country-suggestions" id="ep_suggestions"></div>
+      </div>
+      <div class="place-geo-confirm" id="ep_geoConfirm"></div>
+    </div>
     <div class="field"><label>Ankunft (optional)</label><input id="ep_arrival" type="date" value="${p.arrival||''}" oninput="syncDateRangeField('ep_arrival','ep_departure')"></div>
     <div class="field"><label>Abreise (optional)</label><input id="ep_departure" type="date" value="${p.departure||''}" ${p.departure?'data-autofollow="false"':''} oninput="onDateRangeToInput('ep_departure')"></div>
     <div class="field"><label>Notizen (optional)</label><textarea id="ep_note" rows="3">${escapeHtml(p.note||'')}</textarea></div>
@@ -1919,6 +2018,10 @@ function submitEditPlace(tripId, placeId){
     p.arrival = draft.arrival;
     p.departure = draft.departure;
     p.note = draft.note;
+    if(placeGeocode){
+      p.lat = placeGeocode.lat;
+      p.lng = placeGeocode.lng;
+    }
     closeSheet();
     saveTrips();
     render();
@@ -2377,7 +2480,8 @@ Object.assign(window, {
   openPlaceMenu, openActivityMenu, openWishlistMenu,
   onTripCardTouchStart, onTripCardTouchMove, onTripCardTouchEnd, handleTripCardClick, deleteTripConfirm,
   syncDateRangeField, onDateRangeToInput,
-  exportBackup, onBackupFileSelected
+  exportBackup, onBackupFileSelected,
+  onPlaceNameInput, selectPlaceSuggestion
 });
 
 loadTrips();

@@ -1,6 +1,6 @@
 // Bei jeder inhaltlichen Änderung an der App die Versionsnummer erhöhen,
 // damit Nutzer:innen die neue Version bekommen (alte Caches werden dann verworfen).
-const CACHE_VERSION = 'v20';
+const CACHE_VERSION = 'v21';
 const APP_CACHE = `reiseroute-app-${CACHE_VERSION}`;
 const TILE_CACHE = 'reiseroute-tiles';
 
@@ -62,6 +62,14 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => caches.match(req))
     );
+    return;
+  }
+
+  // Ortssuche (Geocoding): immer frisch vom Netzwerk, nicht cachen — sonst könnten spätere
+  // Suchen nach demselben Begriff veraltete Treffer zeigen. Ohne Internet schlägt die Suche
+  // einfach fehl, das Formular fällt dann auf die manuelle Positionierung zurück.
+  if (url.hostname.endsWith('nominatim.openstreetmap.org')) {
+    event.respondWith(fetch(req));
     return;
   }
 
