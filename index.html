@@ -214,9 +214,7 @@
     font-size:13px;color:var(--text);background:#F2EFE6;border-left:2.5px solid var(--brass);
     padding:6px 10px;margin-top:10px;border-radius:0 6px 6px 0;white-space:pre-wrap;line-height:1.45;
   }
-  .place-actions{display:flex;gap:16px;margin-top:12px;}
-  .place-actions .edit{background:none;border:none;color:var(--teal);cursor:pointer;font-size:12.5px;padding:2px 0;}
-  .place-actions .remove{background:none;border:none;color:var(--danger);cursor:pointer;font-size:12.5px;padding:2px 0;}
+  .place-actions{display:flex;justify-content:flex-end;margin-top:10px;}
 
   .activities{margin-top:14px;border-top:1px solid var(--line);padding-top:8px;}
   .activity-item{
@@ -231,9 +229,24 @@
     font-size:13px;color:var(--text);background:#F2EFE6;border-left:2.5px solid var(--brass);
     padding:6px 10px;margin-top:6px;border-radius:0 6px 6px 0;white-space:pre-wrap;line-height:1.45;
   }
-  .activity-actions{display:flex;flex-direction:column;gap:6px;align-items:flex-end;}
-  .activity-actions .edit{background:none;border:none;color:var(--teal);cursor:pointer;font-size:12px;padding:2px 4px;}
-  .activity-actions .remove{background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:2px 4px;}
+  .activity-actions{display:flex;align-items:flex-start;flex-shrink:0;}
+
+  /* ---- "•••"-Menü-Button, einheitlich für Ort/Aktivität/Wunschlisten-Aktionen ---- */
+  .menu-btn{
+    background:none;border:none;color:var(--text-soft);cursor:pointer;
+    font-size:15px;letter-spacing:2px;line-height:1;padding:6px 8px;border-radius:6px;
+  }
+  .menu-btn:hover{background:rgba(31,48,73,.06);color:var(--ink);}
+  .menu-sheet{
+    background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:10px;
+  }
+  .menu-option{
+    display:block;width:100%;background:none;border:none;border-top:1px solid var(--line);
+    padding:14px;font-size:16px;font-weight:500;color:var(--ink);cursor:pointer;
+    text-align:center;font-family:inherit;
+  }
+  .menu-option:first-child{border-top:none;}
+  .menu-option.danger{color:var(--danger);}
 
   .add-btn{
     width:100%;margin-top:8px;background:none;border:1.5px dashed var(--line);border-radius:8px;
@@ -317,9 +330,7 @@
   }
   .wishlist-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
   .wishlist-head .name{font-size:17px;font-weight:600;}
-  .wishlist-actions{display:flex;gap:12px;flex-shrink:0;padding-top:2px;}
-  .wishlist-actions .edit{background:none;border:none;color:var(--teal);cursor:pointer;font-size:12px;padding:2px 0;}
-  .wishlist-actions .remove{background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:2px 0;}
+  .wishlist-actions{flex-shrink:0;}
   .wishlist-places{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
   .place-tag{
     background:#F2EFE6;border:1px solid var(--line);color:var(--text);
@@ -853,8 +864,7 @@ function renderWishlist(app){
           <div class="wishlist-head">
             <div class="name display">${escapeHtml((w.countries||[]).map(countryLabel).join(', '))}</div>
             <div class="wishlist-actions">
-              <button class="edit" onclick="openEditWishlistForm('${w.id}')">Bearbeiten</button>
-              <button class="remove" onclick="removeWishlistItem('${w.id}')">Entfernen</button>
+              <button class="menu-btn" onclick="openWishlistMenu('${w.id}')">•••</button>
             </div>
           </div>
           ${places.length ? `<div class="wishlist-places">${places.map(p=>`<span class="place-tag">${escapeHtml(p)}</span>`).join('')}</div>` : ''}
@@ -945,6 +955,20 @@ function removeWishlistItem(id){
   render();
 }
 
+function openWishlistMenu(id){
+  const w = state.wishlist.find(x=>x.id===id);
+  if(!w) return;
+  const title = (w.countries||[]).map(countryLabel).join(', ') || 'Eintrag';
+  showSheet(`
+    <h3>${escapeHtml(title)}</h3>
+    <div class="menu-sheet">
+      <button class="menu-option" onclick="openEditWishlistForm('${id}')">Bearbeiten</button>
+      <button class="menu-option danger" onclick="closeSheet();removeWishlistItem('${id}')">Entfernen</button>
+    </div>
+    <button class="secondary" style="width:100%;" onclick="closeSheet()">Abbrechen</button>
+  `);
+}
+
 function renderList(app){
   let html = '';
 
@@ -1023,8 +1047,7 @@ function renderTrip(app, trip){
             ${place.lat==null ? `<button class="place-later-btn" onclick="startPlacingExistingPlace('${trip.id}','${place.id}','${escapeHtml(place.name)}')">📍 Jetzt auf Karte platzieren</button>` : ''}
             ${place.note ? `<div class="place-note">${escapeHtml(place.note)}</div>` : ''}
             <div class="place-actions">
-              <button class="edit" onclick="openEditPlaceForm('${trip.id}','${place.id}')">Ort bearbeiten</button>
-              <button class="remove" onclick="removePlace('${trip.id}','${place.id}')">Ort entfernen</button>
+              <button class="menu-btn" onclick="openPlaceMenu('${trip.id}','${place.id}')">•••</button>
             </div>
             <div class="activities">
               ${sortedActivities(place).map(a => `
@@ -1036,8 +1059,7 @@ function renderTrip(app, trip){
                     ${a.note ? `<div class="note">${escapeHtml(a.note)}</div>` : ''}
                   </div>
                   <div class="activity-actions">
-                    <button class="edit" onclick="openEditActivityForm('${trip.id}','${place.id}','${a.id}')">Bearbeiten</button>
-                    <button class="remove" onclick="removeActivity('${trip.id}','${place.id}','${a.id}')">Entfernen</button>
+                    <button class="menu-btn" onclick="openActivityMenu('${trip.id}','${place.id}','${a.id}')">•••</button>
                   </div>
                 </div>
               `).join('')}
@@ -1527,6 +1549,20 @@ function removePlace(tripId, placeId){
   render();
 }
 
+function openPlaceMenu(tripId, placeId){
+  const trip = getTrip(tripId);
+  const place = trip && (trip.places||[]).find(p=>p.id===placeId);
+  if(!place) return;
+  showSheet(`
+    <h3>${escapeHtml(place.name)}</h3>
+    <div class="menu-sheet">
+      <button class="menu-option" onclick="openEditPlaceForm('${tripId}','${placeId}')">Bearbeiten</button>
+      <button class="menu-option danger" onclick="closeSheet();removePlace('${tripId}','${placeId}')">Entfernen</button>
+    </div>
+    <button class="secondary" style="width:100%;" onclick="closeSheet()">Abbrechen</button>
+  `);
+}
+
 function openEditPlaceForm(tripId, placeId){
   const trip = getTrip(tripId);
   if(!trip) return;
@@ -1679,6 +1715,21 @@ function removeActivity(tripId, placeId, activityId){
   render();
 }
 
+function openActivityMenu(tripId, placeId, activityId){
+  const trip = getTrip(tripId);
+  const place = trip && (trip.places||[]).find(p=>p.id===placeId);
+  const activity = place && (place.activities||[]).find(a=>a.id===activityId);
+  if(!activity) return;
+  showSheet(`
+    <h3>${escapeHtml(activity.name)}</h3>
+    <div class="menu-sheet">
+      <button class="menu-option" onclick="openEditActivityForm('${tripId}','${placeId}','${activityId}')">Bearbeiten</button>
+      <button class="menu-option danger" onclick="closeSheet();removeActivity('${tripId}','${placeId}','${activityId}')">Entfernen</button>
+    </div>
+    <button class="secondary" style="width:100%;" onclick="closeSheet()">Abbrechen</button>
+  `);
+}
+
 // ---------- actions: Fotos ----------
 // Fotos werden vor dem Speichern verkleinert (lange Kante max. 1600px, JPEG ~82%) —
 // Kamerafotos sind sonst oft mehrere MB groß, das würde die App unnötig aufblähen.
@@ -1814,7 +1865,8 @@ Object.assign(window, {
   switchTab, openEditTripForm, submitEditTrip,
   removeCountryChip, onCountryInput, onCountryInputKeydown, selectCountryMatch,
   openNewWishlistForm, submitNewWishlist, openEditWishlistForm, submitEditWishlist, removeWishlistItem,
-  onPhotoFilesSelected, removePhoto, openLightboxForPhoto, closeLightbox
+  onPhotoFilesSelected, removePhoto, openLightboxForPhoto, closeLightbox,
+  openPlaceMenu, openActivityMenu, openWishlistMenu
 });
 
 checkAccess();
