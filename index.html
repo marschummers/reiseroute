@@ -154,9 +154,6 @@
     padding:10px 12px;font-size:15px;font-family:inherit;background:#fff;color:var(--text);
   }
   .field input:focus, .field textarea:focus{outline:none;border-color:var(--teal);}
-  .row2{display:flex;gap:10px;}
-  .row2 .field{flex:1;min-width:0;}
-  .row2 .field input[type="date"], .row2 .field input[type="time"]{padding:10px 6px;font-size:14px;}
   .sheet-actions{display:flex;gap:10px;margin-top:6px;}
   .sheet-actions button{flex:1;}
 
@@ -1471,10 +1468,8 @@ function openNewTripForm(){
   showSheet(`
     <h3>Neue Reise</h3>
     ${countryPickerFieldHtml()}
-    <div class="row2">
-      <div class="field"><label>Von</label><input id="f_from" type="date" oninput="syncDateRangeField('f_from','f_to')"></div>
-      <div class="field"><label>Bis</label><input id="f_to" type="date"></div>
-    </div>
+    <div class="field"><label>Von</label><input id="f_from" type="date" oninput="syncDateRangeField('f_from','f_to')"></div>
+    <div class="field"><label>Bis</label><input id="f_to" type="date"></div>
     <div class="field"><label>Notizen (optional)</label><textarea id="f_notes" rows="2" placeholder="Planungsnotizen…"></textarea></div>
     <div class="sheet-actions">
       <button class="secondary" onclick="closeSheet()">Abbrechen</button>
@@ -1511,10 +1506,8 @@ function openEditTripForm(tripId){
   showSheet(`
     <h3>Reise bearbeiten</h3>
     ${countryPickerFieldHtml()}
-    <div class="row2">
-      <div class="field"><label>Von</label><input id="t_from" type="date" value="${trip.dateFrom}" oninput="syncDateRangeField('t_from','t_to')"></div>
-      <div class="field"><label>Bis</label><input id="t_to" type="date" value="${trip.dateTo}"></div>
-    </div>
+    <div class="field"><label>Von</label><input id="t_from" type="date" value="${trip.dateFrom}" oninput="syncDateRangeField('t_from','t_to')"></div>
+    <div class="field"><label>Bis</label><input id="t_to" type="date" value="${trip.dateTo}"></div>
     <div class="field"><label>Notizen (optional)</label><textarea id="t_notes" rows="2">${escapeHtml(trip.notes||'')}</textarea></div>
     <div class="sheet-actions">
       <button class="secondary" onclick="closeSheet()">Abbrechen</button>
@@ -1564,10 +1557,8 @@ function openNewPlaceForm(){
   showSheet(`
     <h3>Neuer Ort</h3>
     <div class="field"><label>Name</label><input id="p_name" placeholder="z.B. Kapstadt"></div>
-    <div class="row2">
-      <div class="field"><label>Ankunft (optional)</label><input id="p_arrival" type="date" oninput="syncDateRangeField('p_arrival','p_departure')"></div>
-      <div class="field"><label>Abreise (optional)</label><input id="p_departure" type="date"></div>
-    </div>
+    <div class="field"><label>Ankunft (optional)</label><input id="p_arrival" type="date" oninput="syncDateRangeField('p_arrival','p_departure')"></div>
+    <div class="field"><label>Abreise (optional)</label><input id="p_departure" type="date"></div>
     <div class="field"><label>Notizen (optional)</label><textarea id="p_note" rows="3" placeholder="z.B. Unterkunft, Anreise-Infos…"></textarea></div>
     <div class="sheet-actions">
       <button class="secondary" onclick="submitNewPlaceNoPosition()">Ohne Position speichern</button>
@@ -1673,10 +1664,8 @@ function openEditPlaceForm(tripId, placeId){
   showSheet(`
     <h3>Ort bearbeiten</h3>
     <div class="field"><label>Name</label><input id="ep_name" value="${escapeHtml(p.name)}"></div>
-    <div class="row2">
-      <div class="field"><label>Ankunft (optional)</label><input id="ep_arrival" type="date" value="${p.arrival||''}" oninput="syncDateRangeField('ep_arrival','ep_departure')"></div>
-      <div class="field"><label>Abreise (optional)</label><input id="ep_departure" type="date" value="${p.departure||''}"></div>
-    </div>
+    <div class="field"><label>Ankunft (optional)</label><input id="ep_arrival" type="date" value="${p.arrival||''}" oninput="syncDateRangeField('ep_arrival','ep_departure')"></div>
+    <div class="field"><label>Abreise (optional)</label><input id="ep_departure" type="date" value="${p.departure||''}"></div>
     <div class="field"><label>Notizen (optional)</label><textarea id="ep_note" rows="3">${escapeHtml(p.note||'')}</textarea></div>
     <div class="sheet-actions">
       <button class="secondary" onclick="closeSheet()">Abbrechen</button>
@@ -1711,10 +1700,8 @@ function openNewActivityForm(tripId, placeId){
   showSheet(`
     <h3>Aktivität hinzufügen</h3>
     <div class="field"><label>Name</label><input id="a_name" placeholder="z.B. Whale Watching Tour"></div>
-    <div class="row2">
-      <div class="field"><label>Datum (optional)</label><input id="a_date" type="date"></div>
-      <div class="field"><label>Uhrzeit (optional)</label><input id="a_time" type="time"></div>
-    </div>
+    <div class="field"><label>Datum (optional)</label><input id="a_date" type="date"></div>
+    <div class="field"><label>Uhrzeit (optional)</label><input id="a_time" type="time"></div>
     <div class="field"><label>Notizen</label><textarea id="a_note" rows="4" placeholder="z.B. Treffpunkt am Hafen, Tickets schon gebucht…"></textarea></div>
     <div class="sheet-actions">
       <button class="secondary" onclick="closeSheet()">Abbrechen</button>
@@ -1772,10 +1759,8 @@ function openEditActivityForm(tripId, placeId, activityId){
   showSheet(`
     <h3>Aktivität bearbeiten</h3>
     <div class="field"><label>Name</label><input id="ea_name" value="${escapeHtml(a.name)}"></div>
-    <div class="row2">
-      <div class="field"><label>Datum (optional)</label><input id="ea_date" type="date" value="${a.date||''}"></div>
-      <div class="field"><label>Uhrzeit (optional)</label><input id="ea_time" type="time" value="${a.time||''}"></div>
-    </div>
+    <div class="field"><label>Datum (optional)</label><input id="ea_date" type="date" value="${a.date||''}"></div>
+    <div class="field"><label>Uhrzeit (optional)</label><input id="ea_time" type="time" value="${a.time||''}"></div>
     <div class="field"><label>Notizen</label><textarea id="ea_note" rows="4">${escapeHtml(a.note||'')}</textarea></div>
     <div class="sheet-actions">
       <button class="secondary" onclick="closeSheet()">Abbrechen</button>
