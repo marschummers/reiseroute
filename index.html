@@ -95,9 +95,24 @@
     transition:box-shadow .15s ease, transform .2s ease;
   }
   .trip-card:hover{box-shadow:0 4px 14px rgba(31,48,73,.10);}
+  .trip-card-inner{display:flex;align-items:center;gap:14px;}
+  .trip-cover{
+    width:60px;height:60px;border-radius:8px;overflow:hidden;flex-shrink:0;
+    background:#EFEAE0;border:1px solid var(--line);
+  }
+  .trip-cover img{width:100%;height:100%;object-fit:cover;display:block;}
+  .trip-card-text{flex:1;min-width:0;}
   .trip-card .name{font-size:19px;font-weight:600;}
   .trip-card .dates{font-size:13px;color:var(--text-soft);margin-top:3px;}
   .trip-card .meta{font-size:12.5px;color:var(--brass);margin-top:8px;font-weight:600;}
+
+  .next-trip-banner{
+    display:flex;align-items:center;gap:12px;background:var(--brass);color:#fff;
+    border-radius:10px;padding:14px 16px;margin-bottom:14px;cursor:pointer;
+  }
+  .next-trip-banner .icon{font-size:22px;flex-shrink:0;}
+  .next-trip-banner .text{flex:1;font-size:14px;font-weight:600;line-height:1.4;}
+  .next-trip-banner .text .sub{font-size:12px;font-weight:500;opacity:.9;margin-top:1px;}
 
   .empty{
     text-align:center;padding:60px 20px;color:var(--text-soft);
@@ -330,6 +345,13 @@
   }
   .stat-tile .num{font-size:30px;font-weight:700;color:var(--ink);line-height:1;}
   .stat-tile .label{font-size:11.5px;color:var(--text-soft);margin-top:4px;}
+
+  .distance-card{
+    text-align:center;background:var(--card);border:1px solid var(--line);
+    border-radius:10px;padding:16px;margin-bottom:18px;
+  }
+  .distance-card .num{font-size:26px;font-weight:700;color:var(--ink);line-height:1;}
+  .distance-card .label{font-size:12.5px;color:var(--text-soft);margin-top:5px;}
 
   .year-stats{
     background:var(--card);border:1px solid var(--line);border-radius:10px;
@@ -656,6 +678,70 @@ function fmtDateShort(iso){
 
 function getTrip(id){ return state.trips.find(t => t.id === id); }
 
+// Heutiges Datum als lokales YYYY-MM-DD (NICHT toISOString()/UTC verwenden — das kann je nach
+// Zeitzone/Uhrzeit den falschen Tag liefern, siehe Zeitzonen-Hinweis in PROJEKT_STAND.md).
+function todayIso(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// Tage zwischen zwei YYYY-MM-DD-Daten, zeitzonensicher über Date.UTC (wie dateRange()).
+function daysBetween(fromIso, toIso){
+  const [fy,fm,fd] = fromIso.split('-').map(Number);
+  const [ty,tm,td] = toIso.split('-').map(Number);
+  return Math.round((Date.UTC(ty,tm-1,td) - Date.UTC(fy,fm-1,fd)) / 86400000);
+}
+
+// Aktuell laufende Reise (falls heute im Zeitraum liegt) oder die zeitlich nächste anstehende
+// Reise, für den Hinweis-Banner auf der Startseite.
+function computeTripBanner(){
+  const today = todayIso();
+  const ongoing = state.trips.find(t => t.dateFrom <= today && today <= t.dateTo);
+  if(ongoing) return { type:'ongoing', trip: ongoing };
+  const upcoming = state.trips
+    .filter(t => t.dateFrom > today)
+    .sort((a,b) => a.dateFrom < b.dateFrom ? -1 : 1)[0];
+  if(upcoming) return { type:'upcoming', trip: upcoming, days: daysBetween(today, upcoming.dateFrom) };
+  return null;
+}
+
+// Erstes Foto der Reise (nach Orts-Reihenfolge), fürs Titelbild in der Reisenliste.
+function getTripCoverPhotoId(trip){
+  for(const place of sortedPlaces(trip)){
+    if(place.photoIds && place.photoIds.length) return place.photoIds[0];
+  }
+  return null;
+}
+
+// Luftlinien-Distanz zwischen zwei Koordinaten in km (Haversine-Formel).
+function haversineKm(lat1, lng1, lat2, lng2){
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Summe der Luftlinien-Distanzen zwischen aufeinanderfolgenden Orten (in Routen-Reihenfolge,
+// wie auf der Karte), über alle Reisen hinweg.
+function computeTotalDistanceKm(){
+  let total = 0;
+  state.trips.forEach(trip=>{
+    const points = sortedPlaces(trip).filter(p => p.lat != null && p.lng != null);
+    for(let i=1; i<points.length; i++){
+      total += haversineKm(points[i-1].lat, points[i-1].lng, points[i].lat, points[i].lng);
+    }
+  });
+  return Math.round(total);
+}
+
+function earthCircumferenceLabel(km){
+  const circumference = 40075;
+  const ratio = km / circumference;
+  if(ratio >= 1) return `${ratio.toFixed(1)}× um die Erde`;
+  return `${Math.round(ratio * 100)}% einer Erdumrundung`;
+}
+
 // Orte mit Ankunftsdatum zuerst (chronologisch), Orte ohne Datum danach in Erfassungsreihenfolge.
 function sortedPlaces(trip){
   return (trip.places||[])
@@ -859,6 +945,18 @@ function statsGridHtml(tripStats, countries){
     </div>`;
 }
 
+// Nur anzeigen, wenn es genug platzierte Orte gibt, um überhaupt eine Strecke zu ergeben
+// (sonst wäre die Karte nur eine wenig aussagekräftige "0 km"-Anzeige).
+function distanceCardHtml(){
+  const km = computeTotalDistanceKm();
+  if(km <= 0) return '';
+  return `
+    <div class="distance-card">
+      <div class="num">${km.toLocaleString('de-DE')} km</div>
+      <div class="label">zwischen deinen Orten zurückgelegt — ${earthCircumferenceLabel(km)} 🌍</div>
+    </div>`;
+}
+
 function yearBreakdownHtml(tripStats){
   if(tripStats.years.length < 2) return '';
   return `
@@ -886,6 +984,7 @@ function renderStats(app){
       </div>`;
   } else {
     html += statsGridHtml(tripStats, countries);
+    html += distanceCardHtml();
     html += worldMapHtml(countries);
     html += yearBreakdownHtml(tripStats);
     if(countries.length){
@@ -1050,14 +1149,29 @@ function openWishlistMenu(id){
   `);
 }
 
+function nextTripBannerHtml(){
+  const info = computeTripBanner();
+  if(!info) return '';
+  const label = escapeHtml(tripCountriesLabel(info.trip));
+  if(info.type === 'ongoing'){
+    return `
+      <div class="next-trip-banner" onclick="openTrip('${info.trip.id}')">
+        <div class="icon">✈️</div>
+        <div class="text">Du bist gerade unterwegs<div class="sub">${label}</div></div>
+      </div>`;
+  }
+  const dayLabel = info.days === 1 ? 'Noch 1 Tag' : `Noch ${info.days} Tage`;
+  return `
+    <div class="next-trip-banner" onclick="openTrip('${info.trip.id}')">
+      <div class="icon">🧭</div>
+      <div class="text">${dayLabel} bis<div class="sub">${label}</div></div>
+    </div>`;
+}
+
 function renderList(app){
   let html = '';
 
   const hasAnyPlace = state.trips.some(t => (t.places||[]).some(p => p.lat != null));
-  if(hasAnyPlace){
-    html += `<div class="overview-label">Alle Reisen im Überblick</div>`;
-    html += `<div id="listMap" class="trip-map"></div>`;
-  }
 
   if(state.trips.length === 0){
     html += `
@@ -1067,11 +1181,17 @@ function renderList(app){
         <div style="font-size:13.5px;">Leg deine erste Reise an und trage Orte, Aktivitäten und die Route ein.</div>
       </div>`;
   } else {
+    html += nextTripBannerHtml();
+    if(hasAnyPlace){
+      html += `<div class="overview-label">Alle Reisen im Überblick</div>`;
+      html += `<div id="listMap" class="trip-map"></div>`;
+    }
     state.trips
       .slice()
       .sort((a,b)=> a.dateFrom < b.dateFrom ? 1 : -1)
       .forEach(t=>{
         const dayCount = dateRange(t.dateFrom, t.dateTo).length;
+        const coverPhotoId = getTripCoverPhotoId(t);
         html += `
         <div class="trip-card-wrap">
           <button class="trip-card-delete" onclick="deleteTripConfirm('${t.id}')">Löschen</button>
@@ -1080,9 +1200,14 @@ function renderList(app){
             ontouchstart="onTripCardTouchStart(event,'${t.id}')"
             ontouchmove="onTripCardTouchMove(event,'${t.id}')"
             ontouchend="onTripCardTouchEnd(event,'${t.id}')">
-            <div class="name display">${escapeHtml(tripCountriesLabel(t))}</div>
-            <div class="dates">${fmtDateShort(t.dateFrom)} – ${fmtDateShort(t.dateTo)}</div>
-            <div class="meta">${dayCount} ${dayCount===1?'Tag':'Tage'}</div>
+            <div class="trip-card-inner">
+              ${coverPhotoId ? `<div class="trip-cover" data-photo-id="${coverPhotoId}"><img alt=""></div>` : ''}
+              <div class="trip-card-text">
+                <div class="name display">${escapeHtml(tripCountriesLabel(t))}</div>
+                <div class="dates">${fmtDateShort(t.dateFrom)} – ${fmtDateShort(t.dateTo)}</div>
+                <div class="meta">${dayCount} ${dayCount===1?'Tag':'Tage'}</div>
+              </div>
+            </div>
           </div>
         </div>`;
       });
@@ -1096,6 +1221,17 @@ function renderList(app){
     </div></div>`);
 
   if(hasAnyPlace) initListMap();
+  renderTripCoverPhotos();
+}
+
+function renderTripCoverPhotos(){
+  document.querySelectorAll('.trip-cover[data-photo-id]').forEach(async (el)=>{
+    const photoId = el.dataset.photoId;
+    const url = await getPhotoUrl(photoId);
+    if(!url) return;
+    const img = el.querySelector('img');
+    if(img) img.src = url;
+  });
 }
 
 // Kompakte Vorschau: bis zu 3 Thumbnails + "+". Tippen darauf öffnet immer die volle Galerie

@@ -35,6 +35,13 @@ im Repo — die aktive App ist jetzt **`index.html`** (PWA-Umbau, siehe unten).
   Geräte-Wechsel: auf dem alten Gerät exportieren, auf dem neuen importieren.
 - Übersichtskarte auf der Startseite: alle Reisen, unterschiedliche Farbe pro Reise, nur Ansicht
   (nicht editierbar, kein Klick-Handler)
+- **Titelfoto** je Reise in der Reisenliste (automatisch das erste Foto des ersten Orts mit
+  Fotos, sortiert nach Ankunftsdatum — keine manuelle Auswahl, keine zusätzliche UI dafür)
+- **Nächste-Reise-Hinweis**: Banner ganz oben auf der Startseite, zeigt entweder eine gerade
+  laufende Reise ("Du bist gerade unterwegs") oder einen Countdown zur zeitlich nächsten
+  anstehenden Reise ("Noch 15 Tage bis …"), antippen öffnet die jeweilige Reise
+- **Gereiste Distanz** auf der Statistiken-Seite: Luftlinien-Summe zwischen den platzierten Orten
+  je Reise (Haversine-Formel), mit spielerischem Vergleich zur Erdumrundung (40.075 km)
 - Kein Passwortschutz (mehr) — die App wurde ursprünglich mit einem simplen Passwort-Gate
   ausgeliefert, das aber ohnehin keine echte Sicherheit bot (Passwort stand im Klartext im
   JS-Quelltext). Da alle Daten sowieso nur lokal auf dem Gerät liegen, wurde der Login-Screen auf
