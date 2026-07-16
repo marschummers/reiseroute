@@ -290,6 +290,7 @@
   .sight-title{font-weight:600;font-size:14.5px;}
   .sight-dist{font-size:11.5px;color:var(--text-soft);margin-top:1px;}
   .sight-extract{font-size:13px;color:var(--text);line-height:1.5;margin-top:6px;}
+  .sight-lang{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.03em;color:var(--text-soft);border:1px solid var(--border);border-radius:3px;padding:1px 4px;vertical-align:1px;}
   .sight-link{font-size:12.5px;color:var(--teal);text-decoration:none;font-weight:600;display:inline-block;margin-top:6px;}
   .place-note{
     font-size:13px;color:var(--text);background:#F2EFE6;border-left:2.5px solid var(--brass);
@@ -2043,13 +2044,94 @@ function selectPlaceSuggestion(idPrefix, index){
   if(submitBtn) submitBtn.textContent = 'Ort speichern';
 }
 
-// ---------- Sehenswürdigkeiten in der Nähe (Wikipedia-Geosuche) ----------
-// Automatisch ermittelt (Wikipedia-Artikel mit Geodaten in der Nähe der Ort-Koordinaten),
-// keine handkuratierte Reiseführer-Liste — meist gut, aber nicht garantiert perfekt sortiert.
+// ---------- Sehenswürdigkeiten in der Nähe (OpenStreetMap + Wikipedia) ----------
+// Automatisch ermittelt, keine handkuratierte Reiseführer-Liste. Basis sind extra für Touristen
+// getaggte OpenStreetMap-Punkte (Aussichtspunkt, Museum, Denkmal, Gipfel, ...) — das filtert
+// Zufallstreffer wie Postämter zuverlässig raus. Wo ein Punkt einen deutschen Wikipedia-Artikel
+// verlinkt hat, wird dazu eine kurze Beschreibung nachgeladen; ohne Link gibt's nur Name + Art.
 function formatDistance(meters){
   if(meters == null) return '';
   if(meters < 1000) return Math.round(meters) + ' m';
   return (meters / 1000).toFixed(1) + ' km';
+}
+
+const SIGHT_TYPE_LABELS = {
+  attraction: 'Sehenswürdigkeit', viewpoint: 'Aussichtspunkt', museum: 'Museum',
+  artwork: 'Kunstwerk', gallery: 'Galerie', zoo: 'Zoo', theme_park: 'Freizeitpark',
+  monument: 'Denkmal', castle: 'Burg/Schloss', ruins: 'Ruine', memorial: 'Gedenkstätte',
+  archaeological_site: 'Ausgrabungsstätte', fort: 'Festung', peak: 'Gipfel'
+};
+
+// Öffentlicher Overpass-Mirror ohne Browser-seitige User-Agent-Sperre (der Haupt-Server
+// overpass-api.de verlangt einen eigenen User-Agent-Header, den Browser aus Sicherheitsgründen
+// grundsätzlich nicht per JS setzen lassen — dieser Mirror hat diese Einschränkung nicht).
+const OVERPASS_URL = 'https://maps.mail.ru/osm/tools/overpass/api/interpreter';
+
+async function fetchNearbySights(lat, lng){
+  const radius = 5000;
+  const query = `[out:json][timeout:15];(node["tourism"~"attraction|viewpoint|museum|artwork|gallery|zoo|theme_park"](around:${radius},${lat},${lng});node["historic"~"monument|castle|ruins|memorial|archaeological_site|fort"](around:${radius},${lat},${lng});node["natural"="peak"](around:${radius},${lat},${lng}););out body 40;`;
+  const res = await fetch(OVERPASS_URL, { method: 'POST', body: 'data=' + encodeURIComponent(query) });
+  if(!res.ok) throw new Error('Overpass-Anfrage fehlgeschlagen (HTTP ' + res.status + ')');
+  const data = await res.json();
+  const elements = (data.elements || []).filter(e => e.tags && e.tags.name);
+
+  const sights = elements.map(e => {
+    const typeValue = e.tags.tourism || e.tags.historic || (e.tags.natural === 'peak' ? 'peak' : null);
+    let wikiLang = null, wikiTitle = null;
+    if(e.tags.wikipedia){
+      const idx = e.tags.wikipedia.indexOf(':');
+      if(idx > 0){ wikiLang = e.tags.wikipedia.slice(0, idx); wikiTitle = e.tags.wikipedia.slice(idx + 1); }
+    }
+    return {
+      name: e.tags.name,
+      typeLabel: SIGHT_TYPE_LABELS[typeValue] || '',
+      distMeters: haversineKm(lat, lng, e.lat, e.lon) * 1000,
+      wikiLang, wikiTitle,
+      extract: null
+    };
+  });
+
+  // Duplikate (gleicher Name, z.B. mehrfach gemappte Punkte) rausfiltern.
+  const seen = new Set();
+  const deduped = sights.filter(s => {
+    const key = s.name.toLowerCase();
+    if(seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  deduped.sort((a, b) => a.distMeters - b.distMeters);
+  const top = deduped.slice(0, 12);
+
+  // Kurzbeschreibungen nachladen — nach Sprache gruppiert (die verlinkten Wikipedia-Artikel sind
+  // je nach Region oft nicht auf Deutsch, z.B. meist Englisch in Südafrika), pro Sprache ein
+  // gebündelter Request statt einem pro Treffer. In der Anzeige wird nicht-deutscher Text
+  // gekennzeichnet, damit klar ist, warum da auf einmal Englisch steht.
+  const byLang = {};
+  top.forEach(s => {
+    if(!s.wikiLang || !s.wikiTitle) return;
+    (byLang[s.wikiLang] = byLang[s.wikiLang] || []).push(s);
+  });
+  await Promise.all(Object.entries(byLang).map(async ([lang, items]) => {
+    try{
+      const titles = [...new Set(items.map(s => s.wikiTitle))];
+      const extractUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&exsentences=2&titles=${encodeURIComponent(titles.join('|'))}&format=json&origin=*`;
+      const extractRes = await fetch(extractUrl);
+      const extractData = await extractRes.json();
+      const normalizedMap = {};
+      ((extractData.query && extractData.query.normalized) || []).forEach(n => { normalizedMap[n.from] = n.to; });
+      const extractByTitle = {};
+      const pages = extractData.query ? Object.values(extractData.query.pages) : [];
+      pages.forEach(p => { extractByTitle[p.title] = p.extract; });
+      items.forEach(s => {
+        const normalized = normalizedMap[s.wikiTitle] || s.wikiTitle;
+        s.extract = extractByTitle[normalized] || null;
+      });
+    }catch(e){
+      console.error(`Wikipedia-Kurzbeschreibungen (${lang}) konnten nicht geladen werden:`, e);
+    }
+  }));
+
+  return top;
 }
 
 async function showSights(tripId, placeId){
@@ -2059,35 +2141,23 @@ async function showSights(tripId, placeId){
   showSheet(`
     <h3>Sehenswürdigkeiten — ${escapeHtml(place.name)}</h3>
     <div id="sightsResults"><div class="place-search-status">Lädt…</div></div>
-    <div class="place-search-status" style="text-align:center;">Daten von Wikipedia</div>
+    <div class="place-search-status" style="text-align:center;">Daten von OpenStreetMap &amp; Wikipedia</div>
     <button class="secondary" style="width:100%;margin-top:10px;" onclick="closeSheet()">Schließen</button>
   `);
   try{
-    // prop=coordinates liefert die Koordinaten jedes Treffers zurück — die generator=geosearch
-    // eigene "dist"-Angabe geht bei dieser Kombination mit prop=extracts verloren, daher wird
-    // die Entfernung hier selbst berechnet (dieselbe Haversine-Funktion wie bei der
-    // "gereiste Distanz"-Statistik).
-    const url = `https://de.wikipedia.org/w/api.php?action=query&generator=geosearch&ggscoord=${place.lat}%7C${place.lng}&ggsradius=10000&ggslimit=10&prop=extracts|coordinates&exintro=true&explaintext=true&exsentences=2&format=json&origin=*`;
-    const res = await fetch(url);
-    const data = await res.json();
-    const pages = data.query && data.query.pages ? Object.values(data.query.pages) : [];
-    pages.forEach(p=>{
-      const coord = p.coordinates && p.coordinates[0];
-      p._distMeters = coord ? haversineKm(place.lat, place.lng, coord.lat, coord.lon) * 1000 : null;
-    });
-    pages.sort((a, b) => (a._distMeters ?? Infinity) - (b._distMeters ?? Infinity));
+    const sights = await fetchNearbySights(place.lat, place.lng);
     const box = document.getElementById('sightsResults');
     if(!box) return;
-    if(!pages.length){
-      box.innerHTML = `<div class="place-search-status">Keine Einträge in der Nähe gefunden.</div>`;
+    if(!sights.length){
+      box.innerHTML = `<div class="place-search-status">Keine Sehenswürdigkeiten in der Nähe gefunden.</div>`;
       return;
     }
-    box.innerHTML = pages.map(p => `
+    box.innerHTML = sights.map(s => `
       <div class="sight-item">
-        <div class="sight-title">${escapeHtml(p.title)}</div>
-        ${p._distMeters != null ? `<div class="sight-dist">${formatDistance(p._distMeters)} entfernt</div>` : ''}
-        ${p.extract ? `<div class="sight-extract">${escapeHtml(p.extract)}</div>` : ''}
-        <a class="sight-link" href="https://de.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}" target="_blank" rel="noopener">Mehr auf Wikipedia →</a>
+        <div class="sight-title">${escapeHtml(s.name)}</div>
+        <div class="sight-dist">${s.typeLabel ? escapeHtml(s.typeLabel) + ' · ' : ''}${formatDistance(s.distMeters)} entfernt</div>
+        ${s.extract ? `<div class="sight-extract">${s.wikiLang && s.wikiLang !== 'de' ? `<span class="sight-lang">${escapeHtml(s.wikiLang.toUpperCase())}</span> ` : ''}${escapeHtml(s.extract)}</div>` : ''}
+        ${s.wikiTitle ? `<a class="sight-link" href="https://${s.wikiLang}.wikipedia.org/wiki/${encodeURIComponent(s.wikiTitle.replace(/ /g,'_'))}" target="_blank" rel="noopener">Mehr auf Wikipedia →</a>` : ''}
       </div>
     `).join('');
   }catch(e){

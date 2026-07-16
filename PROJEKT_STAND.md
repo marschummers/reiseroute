@@ -24,12 +24,21 @@ im Repo — die aktive App ist jetzt **`index.html`** (PWA-Umbau, siehe unten).
   gespeichert und später über einen Button nachträglich platziert werden
 - Marker sind eigene Inline-SVG-Pins (kein externes Icon-Bild, das war ein früherer Bug)
 - **Sehenswürdigkeiten anzeigen** (Button pro Ort, nur wenn eine Position gesetzt ist): fragt
-  Wikipedia per Geosuche nach Artikeln in der Nähe der Ort-Koordinaten (10 km Radius, bis zu 10
-  Treffer) inkl. kurzer Zusammenfassung, sortiert nach selbst berechneter Entfernung (Haversine
-  — die von der Wikipedia-API gelieferte "dist"-Angabe geht bei dieser Abfrage-Kombination
-  verloren). Automatisch ermittelt, keine handkuratierte Liste — meist gut, aber nicht
-  garantiert perfekt relevant/sortiert. Jeder Treffer verlinkt auf den vollständigen
-  Wikipedia-Artikel. Braucht Internet im Moment der Abfrage.
+  OpenStreetMap per Overpass-API nach echten POIs mit Tourismus-/Historic-Tags (Attraktion,
+  Aussichtspunkt, Museum, Denkmal, Burg, Gipfel etc., 5 km Radius, bis zu 12 Treffer, sortiert
+  nach selbst berechneter Entfernung/Haversine). Das liefert deutlich zielgerichtetere Treffer
+  als eine reine Wikipedia-Geosuche (die z.B. auch irrelevante Artikel wie "die Post von
+  Kapstadt" vorschlug und bei kleineren Orten oft nur den Stadtartikel selbst fand). Für Treffer
+  mit einem `wikipedia`-Tag wird zusätzlich eine kurze Zusammenfassung von Wikipedia
+  nachgeladen — in der jeweils im OSM-Tag hinterlegten Sprache (meist Englisch bei
+  internationalen Zielen, nicht nur Deutsch), mit kleinem Sprachkürzel-Badge bei
+  nicht-deutschen Texten. Automatisch ermittelt, keine handkuratierte Liste. Jeder Treffer mit
+  Wikipedia-Artikel verlinkt auf die passende Sprachversion. Braucht Internet im Moment der
+  Abfrage.
+  - Technischer Hinweis: Die Haupt-Overpass-Instanz (overpass-api.de) verlangt einen
+    benutzerdefinierten User-Agent-Header, den Browser aus JS heraus nicht setzen dürfen —
+    daher wird stattdessen der CORS-freundliche Mirror
+    `https://maps.mail.ru/osm/tools/overpass/api/interpreter` verwendet.
 - **Ortssuche beim Namen-Eintippen** (Anlegen und Bearbeiten eines Orts): Vorschlagsliste per
   Nominatim/OpenStreetMap-Geocoding (z.B. "Seefeld" → "Seefeld in Tirol" zur Auswahl), Auswahl
   übernimmt Name UND Position direkt — kein Antippen der Karte mehr nötig. Freitext ohne
