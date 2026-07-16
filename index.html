@@ -1784,11 +1784,14 @@ function togglePlace(placeId){
 }
 
 function openNewPlaceForm(){
+  const trip = getTrip(state.currentTripId);
+  const defaultArrival = trip ? trip.dateFrom : '';
+  const defaultDeparture = trip ? trip.dateTo : '';
   showSheet(`
     <h3>Neuer Ort</h3>
     <div class="field"><label>Name</label><input id="p_name" placeholder="z.B. Kapstadt"></div>
-    <div class="field"><label>Ankunft (optional)</label><input id="p_arrival" type="date" oninput="syncDateRangeField('p_arrival','p_departure')"></div>
-    <div class="field"><label>Abreise (optional)</label><input id="p_departure" type="date" oninput="onDateRangeToInput('p_departure')"></div>
+    <div class="field"><label>Ankunft (optional)</label><input id="p_arrival" type="date" value="${defaultArrival}" oninput="syncDateRangeField('p_arrival','p_departure')"></div>
+    <div class="field"><label>Abreise (optional)</label><input id="p_departure" type="date" value="${defaultDeparture}" data-autofollow="false" oninput="onDateRangeToInput('p_departure')"></div>
     <div class="field"><label>Notizen (optional)</label><textarea id="p_note" rows="3" placeholder="z.B. Unterkunft, Anreise-Infos…"></textarea></div>
     <div class="sheet-actions">
       <button class="secondary" onclick="submitNewPlaceNoPosition()">Ohne Position speichern</button>
